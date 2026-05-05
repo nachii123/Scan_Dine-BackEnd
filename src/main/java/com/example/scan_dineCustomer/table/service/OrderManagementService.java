@@ -1,0 +1,697 @@
+package com.example.scan_dineCustomer.table.service;
+
+import com.example.scan_dineCustomer.entity.MenuItem;
+import com.example.scan_dineCustomer.entity.Restaurant;
+import com.example.scan_dineCustomer.enums.OrderItemStatus;
+import com.example.scan_dineCustomer.enums.OrderStatus;
+import com.example.scan_dineCustomer.enums.SessionStatus;
+import com.example.scan_dineCustomer.enums.TableStatus;
+import com.example.scan_dineCustomer.repo.MenuItemRepository;
+import com.example.scan_dineCustomer.repo.RestaurantRepository;
+import com.example.scan_dineCustomer.table.dto.BillResponse;
+import com.example.scan_dineCustomer.table.dto.DailySalesReport;
+import com.example.scan_dineCustomer.table.dto.EstimatedWaitResponse;
+import com.example.scan_dineCustomer.table.dto.KitchenOrderView;
+import com.example.scan_dineCustomer.table.dto.KotResponse;
+import com.example.scan_dineCustomer.table.dto.OrderItemRequest;
+import com.example.scan_dineCustomer.table.dto.OrderRatingRequest;
+import com.example.scan_dineCustomer.table.dto.OrderRatingResponse;
+import com.example.scan_dineCustomer.table.dto.OrderResponse;
+import com.example.scan_dineCustomer.table.dto.PlaceOrderRequest;
+import com.example.scan_dineCustomer.table.dto.ScanTableRequest;
+import com.example.scan_dineCustomer.table.dto.SessionResponse;
+import com.example.scan_dineCustomer.table.entity.DineOrder;
+import com.example.scan_dineCustomer.table.entity.OrderItem;
+import com.example.scan_dineCustomer.table.entity.OrderRating;
+import com.example.scan_dineCustomer.table.entity.RestaurantTable;
+import com.example.scan_dineCustomer.table.entity.TableSession;
+import com.example.scan_dineCustomer.table.repository.OrderRatingRepository;
+import com.example.scan_dineCustomer.table.repository.OrderRepository;
+import com.example.scan_dineCustomer.table.repository.RestaurantTableRepository;
+import com.example.scan_dineCustomer.table.repository.TableSessionRepository;
+import com.example.scan_dineCustomer.util.JwtUtil;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class OrderManagementService {
+
+    private final RestaurantTableRepository tableRepository;
+    private final TableSessionRepository sessionRepository;
+    private final OrderRepository orderRepository;
+    private final MenuItemRepository menuItemRepository;
+    private final RestaurantRepository restaurantRepository;
+    private final JwtUtil jwtUtil;
+    private final OrderRatingRepository orderRatingRepository;
+
+    @Transactional("tableTransactionManager")
+    public SessionResponse scanTable(ScanTableRequest request) {
+        RestaurantTable table = tableRepository.findByIdAndRestaurantId(request.getTableId(), request.getRestaurantId())
+                .orElseThrow(() -> new IllegalArgumentException("Table not found"));
+
+        if (!table.isActive()) {
+            throw new IllegalStateException("This table is currently inactive");
+        }
+
+        // Return existing session if one is already active (multiple customers scanning the same table)
+        Optional<TableSession> existing = sessionRepository.findByTable_IdAndStatus(table.getId(), SessionStatus.ACTIVE);
+        if (existing.isPresent()) {
+            return SessionResponse.from(existing.get());
+        }
+
+        if (table.getStatus() != TableStatus.AVAILABLE) {
+            throw new IllegalStateException("Table is not available. Current status: " + table.getStatus());
+        }
+
+        TableSession session = new TableSession();
+        session.setTable(table);
+        session.setRestaurantId(request.getRestaurantId());
+        session.setCustomerCount(request.getCustomerCount() > 0 ? request.getCustomerCount() : 1);
+        session.setStatus(SessionStatus.ACTIVE);
+
+        TableSession saved = sessionRepository.save(session);
+
+        table.setStatus(TableStatus.OCCUPIED);
+        tableRepository.save(table);
+
+        return SessionResponse.from(saved);
+    }
+
+    @Transactional("tableTransactionManager")
+    public OrderResponse placeOrder(PlaceOrderRequest request) {
+        TableSession session = sessionRepository.findById(request.getSessionId())
+                .orElseThrow(() -> new IllegalArgumentException("Session not found: " + request.getSessionId()));
+
+        if (session.getStatus() != SessionStatus.ACTIVE) {
+            log.info("Session Id is INACTIVE {}", session.getStatus());
+            return null;
+        }
+
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            log.info("request items null or empty {}", request.getItems());
+            return null;
+        }
+
+        String customerId = extractCustomerIdFromToken();
+
+        DineOrder order = new DineOrder();
+        order.setSession(session);
+        order.setRestaurantId(request.getRestaurantId());
+        order.setTableId(session.getTable().getId());
+        order.setCustomerId(customerId);
+        order.setNotes(request.getNotes());
+        order.setStatus(OrderStatus.PENDING);
+
+        BigDecimal total = BigDecimal.ZERO;
+
+        for (OrderItemRequest itemReq : request.getItems()) {
+            MenuItem menuItem = menuItemRepository.findById(itemReq.getMenuItemId())
+                    .orElseThrow(() -> new IllegalArgumentException("Menu item not found: " + itemReq.getMenuItemId()));
+            log.info("Menu {}", menuItem);
+
+            if (!menuItem.isAvailable()) {
+                log.info("Menu item is currently unavailable: {}", menuItem.getName());
+                return null;
+            }
+
+            BigDecimal lineTotal = menuItem.getBasePrice().multiply(BigDecimal.valueOf(itemReq.getQuantity()));
+
+            OrderItem item = new OrderItem();
+            item.setOrder(order);
+            item.setMenuItemId(menuItem.getId());
+            item.setMenuItemName(menuItem.getName());
+            item.setImageUrl(menuItem.getImageUrl());
+            item.setQuantity(itemReq.getQuantity());
+            item.setUnitPrice(menuItem.getBasePrice());
+            item.setTotalPrice(lineTotal);
+            item.setNotes(itemReq.getNotes());
+            item.setStatus(OrderItemStatus.PENDING);
+
+            order.getItems().add(item);
+            total = total.add(lineTotal);
+        }
+
+        order.setTotalAmount(total);
+
+        DineOrder saved = orderRepository.save(order);
+        return OrderResponse.from(saved);
+    }
+
+    @Transactional(value = "tableTransactionManager", readOnly = true)
+    public List<OrderResponse> getOrdersByCustomerId(String customerId) {
+        return orderRepository.findByCustomerIdOrderByCreatedAtDesc(customerId).stream()
+                .map(OrderResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(value = "tableTransactionManager", readOnly = true)
+    public List<OrderResponse> getSessionOrders(String sessionId) {
+        return orderRepository.findBySessionId(sessionId).stream()
+                .map(OrderResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(value = "tableTransactionManager", readOnly = true)
+    public OrderResponse getOrder(String orderId) {
+        DineOrder order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        return OrderResponse.from(order);
+    }
+
+    @Transactional(value = "tableTransactionManager", readOnly = true)
+    public List<OrderResponse> getPendingOrders(String restaurantId) {
+        List<OrderStatus> statuses = List.of(OrderStatus.PENDING, OrderStatus.PARTIALLY_ACCEPTED);
+        return orderRepository.findByRestaurantIdAndStatusIn(restaurantId, statuses).stream()
+                .map(OrderResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional("tableTransactionManager")
+    public OrderResponse acceptOrder(String orderId, String captainId, String captainName) {
+        DineOrder order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+
+        order.setStatus(OrderStatus.ACCEPTED);
+        order.setCaptainId(captainId);
+        order.setCaptainName(captainName);
+        order.getItems().stream()
+                .filter(i -> i.getStatus() == OrderItemStatus.PENDING)
+                .forEach(i -> i.setStatus(OrderItemStatus.ACCEPTED));
+
+        return OrderResponse.from(orderRepository.save(order));
+    }
+
+    @Transactional("tableTransactionManager")
+    public OrderResponse markOrderPreparing(String orderId, String captainId, String captainName) {
+        DineOrder order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        if (order.getStatus() != OrderStatus.ACCEPTED && order.getStatus() != OrderStatus.PARTIALLY_ACCEPTED) {
+            throw new IllegalStateException("Order must be ACCEPTED before marking as PREPARING");
+        }
+        order.setStatus(OrderStatus.PREPARING);
+        order.setCaptainId(captainId);
+        order.setCaptainName(captainName);
+        order.setPreparingStartedAt(Instant.now());
+        order.getItems().stream()
+                .filter(i -> i.getStatus() == OrderItemStatus.ACCEPTED)
+                .forEach(i -> i.setStatus(OrderItemStatus.PREPARING));
+        return OrderResponse.from(orderRepository.save(order));
+    }
+
+    @Transactional("tableTransactionManager")
+    public OrderResponse markOrderReady(String orderId, String captainId, String captainName) {
+        DineOrder order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        if (order.getStatus() != OrderStatus.PREPARING) {
+            throw new IllegalStateException("Order must be PREPARING before marking as READY");
+        }
+        order.setStatus(OrderStatus.READY);
+        order.setCaptainId(captainId);
+        order.setCaptainName(captainName);
+        order.getItems().stream()
+                .filter(i -> i.getStatus() == OrderItemStatus.PREPARING)
+                .forEach(i -> i.setStatus(OrderItemStatus.READY));
+        return OrderResponse.from(orderRepository.save(order));
+    }
+
+    @Transactional("tableTransactionManager")
+    public OrderResponse rejectOrder(String orderId, String reason, String captainId, String captainName) {
+        DineOrder order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+
+        order.setStatus(OrderStatus.CANCELLED);
+        order.setCaptainId(captainId);
+        order.setCaptainName(captainName);
+        if (reason != null && !reason.isBlank()) {
+            order.setNotes(reason);
+        }
+        order.getItems().stream()
+                .filter(i -> i.getStatus() == OrderItemStatus.PENDING)
+                .forEach(i -> i.setStatus(OrderItemStatus.REJECTED));
+
+        return OrderResponse.from(orderRepository.save(order));
+    }
+
+    @Transactional("tableTransactionManager")
+    public OrderResponse serveItem(String orderId, String itemId, String captainId, String captainName) {
+        DineOrder order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+
+        order.getItems().stream()
+                .filter(i -> i.getId().equals(itemId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Item not found in this order"))
+                .setStatus(OrderItemStatus.SERVED);
+
+        order.setCaptainId(captainId);
+        order.setCaptainName(captainName);
+
+        boolean allDone = order.getItems().stream()
+                .allMatch(i -> i.getStatus() == OrderItemStatus.SERVED || i.getStatus() == OrderItemStatus.REJECTED);
+        if (allDone) {
+            order.setStatus(OrderStatus.SERVED);
+        }
+
+        return OrderResponse.from(orderRepository.save(order));
+    }
+
+    public String extractCustomerIdFromSecurityContext(
+            org.springframework.security.core.Authentication auth) {
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new IllegalStateException("Authentication required");
+        }
+        String token = auth.getCredentials() != null ? auth.getCredentials().toString() : null;
+        if (token == null || token.isBlank()) {
+            throw new IllegalStateException("Authentication token missing");
+        }
+        return jwtUtil.extractCustomerId(token);
+    }
+
+    private String extractCustomerIdFromToken() {
+        return extractCustomerIdFromSecurityContext(
+                SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Transactional("tableTransactionManager")
+    public OrderResponse captainAddItems(String orderId, List<OrderItemRequest> itemRequests, String captainId, String captainName) {
+        DineOrder order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        order.setCaptainId(captainId);
+        order.setCaptainName(captainName);
+
+        BigDecimal extra = BigDecimal.ZERO;
+
+        for (OrderItemRequest req : itemRequests) {
+            MenuItem menuItem = menuItemRepository.findById(req.getMenuItemId())
+                    .orElseThrow(() -> new IllegalArgumentException("Menu item not found: " + req.getMenuItemId()));
+
+            BigDecimal lineTotal = menuItem.getBasePrice().multiply(BigDecimal.valueOf(req.getQuantity()));
+
+            OrderItem item = new OrderItem();
+            item.setOrder(order);
+            item.setMenuItemId(menuItem.getId());
+            item.setMenuItemName(menuItem.getName());
+            item.setImageUrl(menuItem.getImageUrl());
+            item.setQuantity(req.getQuantity());
+            item.setUnitPrice(menuItem.getBasePrice());
+            item.setTotalPrice(lineTotal);
+            item.setNotes(req.getNotes());
+            // Captain-added items skip the PENDING state
+            item.setStatus(OrderItemStatus.ACCEPTED);
+
+            order.getItems().add(item);
+            extra = extra.add(lineTotal);
+        }
+
+        order.setTotalAmount(order.getTotalAmount().add(extra));
+
+        return OrderResponse.from(orderRepository.save(order));
+    }
+
+    // ─── Feature 2: Bill Request & Call Waiter ───────────────────────────────────
+
+    @Transactional("tableTransactionManager")
+    public SessionResponse requestBill(String sessionId, String restaurantId) {
+        TableSession session = sessionRepository.findByIdAndRestaurantId(sessionId, restaurantId)
+                .orElseThrow(() -> new IllegalArgumentException("Session not found"));
+        if (session.getStatus() != SessionStatus.ACTIVE) {
+            throw new IllegalStateException("Session is not active");
+        }
+        session.setBillRequested(true);
+        session.setBillRequestedAt(Instant.now());
+        return SessionResponse.from(sessionRepository.save(session));
+    }
+
+    @Transactional("tableTransactionManager")
+    public SessionResponse callWaiter(String sessionId, String restaurantId) {
+        TableSession session = sessionRepository.findByIdAndRestaurantId(sessionId, restaurantId)
+                .orElseThrow(() -> new IllegalArgumentException("Session not found"));
+        if (session.getStatus() != SessionStatus.ACTIVE) {
+            throw new IllegalStateException("Session is not active");
+        }
+        session.setWaiterCalled(true);
+        session.setWaiterCalledAt(Instant.now());
+        return SessionResponse.from(sessionRepository.save(session));
+    }
+
+    @Transactional("tableTransactionManager")
+    public SessionResponse acknowledgeBillRequest(String sessionId) {
+        TableSession session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new IllegalArgumentException("Session not found"));
+        session.setBillRequested(false);
+        session.setBillRequestedAt(null);
+        return SessionResponse.from(sessionRepository.save(session));
+    }
+
+    @Transactional("tableTransactionManager")
+    public SessionResponse acknowledgeWaiterCall(String sessionId) {
+        TableSession session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new IllegalArgumentException("Session not found"));
+        session.setWaiterCalled(false);
+        session.setWaiterCalledAt(null);
+        return SessionResponse.from(sessionRepository.save(session));
+    }
+
+    // ─── Feature 3: Order Rating ─────────────────────────────────────────────────
+
+    @Transactional("tableTransactionManager")
+    public OrderRatingResponse rateOrder(String orderId, OrderRatingRequest request, String customerId) {
+        DineOrder order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        if (!order.getCustomerId().equals(customerId)) {
+            throw new IllegalStateException("You can only rate your own orders");
+        }
+        if (order.getStatus() != OrderStatus.SERVED) {
+            throw new IllegalStateException("You can only rate a served order");
+        }
+        if (orderRatingRepository.findByOrderId(orderId).isPresent()) {
+            throw new IllegalStateException("Order has already been rated");
+        }
+        if (request.getRating() < 1 || request.getRating() > 5) {
+            throw new IllegalArgumentException("Rating must be between 1 and 5");
+        }
+        OrderRating rating = new OrderRating();
+        rating.setOrderId(orderId);
+        rating.setCustomerId(customerId);
+        rating.setRestaurantId(order.getRestaurantId());
+        rating.setRating(request.getRating());
+        rating.setComment(request.getComment());
+        return OrderRatingResponse.from(orderRatingRepository.save(rating));
+    }
+
+    @Transactional(value = "tableTransactionManager", readOnly = true)
+    public List<OrderRatingResponse> getRestaurantRatings(String restaurantId) {
+        return orderRatingRepository.findByRestaurantIdOrderByCreatedAtDesc(restaurantId)
+                .stream().map(OrderRatingResponse::from).collect(Collectors.toList());
+    }
+
+    // ─── Feature 4: Estimated Wait Time ─────────────────────────────────────────
+
+    @Transactional(value = "tableTransactionManager", readOnly = true)
+    public EstimatedWaitResponse getEstimatedWaitTime(String orderId) {
+        DineOrder order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+
+        List<EstimatedWaitResponse.ItemWaitInfo> itemInfos = new ArrayList<>();
+        int totalEstimated = 0;
+
+        for (OrderItem item : order.getItems()) {
+            if (item.getStatus() == OrderItemStatus.REJECTED || item.getStatus() == OrderItemStatus.CANCELLED) continue;
+            MenuItem menuItem = menuItemRepository.findById(item.getMenuItemId()).orElse(null);
+            int prepTime = menuItem != null ? menuItem.getPrepTimeMinutes() : 15;
+            totalEstimated = Math.max(totalEstimated, prepTime); // parallel cooking
+            itemInfos.add(EstimatedWaitResponse.ItemWaitInfo.builder()
+                    .menuItemName(item.getMenuItemName())
+                    .quantity(item.getQuantity())
+                    .prepTimeMinutes(prepTime)
+                    .build());
+        }
+
+        long preparingFor = 0;
+        if (order.getPreparingStartedAt() != null) {
+            preparingFor = Duration.between(order.getPreparingStartedAt(), Instant.now()).toMinutes();
+        }
+        int remaining = (int) Math.max(0, totalEstimated - preparingFor);
+
+        return EstimatedWaitResponse.builder()
+                .orderId(orderId)
+                .estimatedMinutes(totalEstimated)
+                .preparingForMinutes(preparingFor)
+                .remainingMinutes(remaining)
+                .items(itemInfos)
+                .build();
+    }
+
+    // ─── Feature 6: Reorder ──────────────────────────────────────────────────────
+
+    @Transactional("tableTransactionManager")
+    public OrderResponse reorder(String previousOrderId, String sessionId, String restaurantId, String customerId) {
+        DineOrder previousOrder = orderRepository.findById(previousOrderId)
+                .orElseThrow(() -> new IllegalArgumentException("Previous order not found: " + previousOrderId));
+
+        TableSession session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new IllegalArgumentException("Session not found: " + sessionId));
+
+        if (session.getStatus() != SessionStatus.ACTIVE) {
+            throw new IllegalStateException("Session is not active");
+        }
+
+        DineOrder newOrder = new DineOrder();
+        newOrder.setSession(session);
+        newOrder.setRestaurantId(restaurantId);
+        newOrder.setTableId(session.getTable().getId());
+        newOrder.setCustomerId(customerId);
+        newOrder.setNotes("Reorder from " + previousOrderId);
+        newOrder.setStatus(OrderStatus.PENDING);
+
+        BigDecimal total = BigDecimal.ZERO;
+
+        for (OrderItem prevItem : previousOrder.getItems()) {
+            if (prevItem.getStatus() == OrderItemStatus.REJECTED || prevItem.getStatus() == OrderItemStatus.CANCELLED) continue;
+            MenuItem menuItem = menuItemRepository.findById(prevItem.getMenuItemId()).orElse(null);
+            if (menuItem == null || !menuItem.isAvailable()) continue;
+
+            BigDecimal lineTotal = menuItem.getBasePrice().multiply(BigDecimal.valueOf(prevItem.getQuantity()));
+
+            OrderItem item = new OrderItem();
+            item.setOrder(newOrder);
+            item.setMenuItemId(menuItem.getId());
+            item.setMenuItemName(menuItem.getName());
+            item.setImageUrl(menuItem.getImageUrl());
+            item.setQuantity(prevItem.getQuantity());
+            item.setUnitPrice(menuItem.getBasePrice());
+            item.setTotalPrice(lineTotal);
+            item.setNotes(prevItem.getNotes());
+            item.setStatus(OrderItemStatus.PENDING);
+
+            newOrder.getItems().add(item);
+            total = total.add(lineTotal);
+        }
+
+        if (newOrder.getItems().isEmpty()) {
+            throw new IllegalStateException("No available items to reorder");
+        }
+
+        newOrder.setTotalAmount(total);
+        return OrderResponse.from(orderRepository.save(newOrder));
+    }
+
+    // ─── Feature 7: Kitchen Display ──────────────────────────────────────────────
+
+    @Transactional(value = "tableTransactionManager", readOnly = true)
+    public List<KitchenOrderView> getKitchenDisplay(String restaurantId) {
+        List<OrderStatus> activeStatuses = List.of(OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY);
+        return orderRepository.findByRestaurantIdAndStatusIn(restaurantId, activeStatuses)
+                .stream()
+                .map(order -> {
+                    int estimated = order.getItems().stream()
+                            .filter(i -> i.getStatus() != OrderItemStatus.REJECTED && i.getStatus() != OrderItemStatus.CANCELLED)
+                            .mapToInt(i -> {
+                                MenuItem m = menuItemRepository.findById(i.getMenuItemId()).orElse(null);
+                                return m != null ? m.getPrepTimeMinutes() : 15;
+                            })
+                            .max().orElse(15);
+                    return KitchenOrderView.from(order, estimated);
+                })
+                .collect(Collectors.toList());
+    }
+
+    // ─── Feature 8: Daily Sales Report ───────────────────────────────────────────
+
+    @Transactional(value = "tableTransactionManager", readOnly = true)
+    public DailySalesReport getDailySalesReport(String restaurantId, LocalDate date) {
+        ZoneId zone = ZoneId.of("Asia/Kolkata");
+        Instant start = date.atStartOfDay(zone).toInstant();
+        Instant end = date.plusDays(1).atStartOfDay(zone).toInstant();
+
+        List<DineOrder> orders = orderRepository
+                .findByRestaurantIdAndCreatedAtBetweenAndStatusNot(restaurantId, start, end, OrderStatus.CANCELLED);
+
+        BigDecimal totalRevenue = orders.stream()
+                .map(DineOrder::getTotalAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        int totalItemsSold = orders.stream()
+                .flatMap(o -> o.getItems().stream())
+                .filter(i -> i.getStatus() != OrderItemStatus.REJECTED && i.getStatus() != OrderItemStatus.CANCELLED)
+                .mapToInt(OrderItem::getQuantity)
+                .sum();
+
+        // Top items
+        Map<String, int[]> quantityMap = new LinkedHashMap<>();
+        Map<String, BigDecimal> revenueMap = new LinkedHashMap<>();
+        Map<String, String> nameMap = new LinkedHashMap<>();
+        orders.stream().flatMap(o -> o.getItems().stream())
+                .filter(i -> i.getStatus() != OrderItemStatus.REJECTED && i.getStatus() != OrderItemStatus.CANCELLED)
+                .forEach(i -> {
+                    quantityMap.merge(i.getMenuItemId(), new int[]{i.getQuantity()}, (a, b) -> new int[]{a[0] + b[0]});
+                    revenueMap.merge(i.getMenuItemId(), i.getTotalPrice(), BigDecimal::add);
+                    nameMap.putIfAbsent(i.getMenuItemId(), i.getMenuItemName());
+                });
+
+        List<DailySalesReport.TopItemStats> topItems = quantityMap.entrySet().stream()
+                .map(e -> DailySalesReport.TopItemStats.builder()
+                        .menuItemId(e.getKey())
+                        .menuItemName(nameMap.get(e.getKey()))
+                        .quantitySold(e.getValue()[0])
+                        .revenue(revenueMap.getOrDefault(e.getKey(), BigDecimal.ZERO))
+                        .build())
+                .sorted((a, b) -> Integer.compare(b.getQuantitySold(), a.getQuantitySold()))
+                .limit(10)
+                .collect(Collectors.toList());
+
+        // Hourly stats
+        Map<Integer, List<DineOrder>> byHour = orders.stream()
+                .collect(Collectors.groupingBy(o -> o.getCreatedAt().atZone(zone).getHour()));
+
+        List<DailySalesReport.HourlyStats> hourlyStats = byHour.entrySet().stream()
+                .map(e -> DailySalesReport.HourlyStats.builder()
+                        .hour(e.getKey())
+                        .orderCount(e.getValue().size())
+                        .revenue(e.getValue().stream().map(DineOrder::getTotalAmount).reduce(BigDecimal.ZERO, BigDecimal::add))
+                        .build())
+                .sorted(java.util.Comparator.comparingInt(DailySalesReport.HourlyStats::getHour))
+                .collect(Collectors.toList());
+
+        return DailySalesReport.builder()
+                .date(date)
+                .restaurantId(restaurantId)
+                .totalRevenue(totalRevenue)
+                .totalOrders(orders.size())
+                .totalItemsSold(totalItemsSold)
+                .topItems(topItems)
+                .revenueByHour(hourlyStats)
+                .build();
+    }
+
+    // ─── KOT (Kitchen Order Ticket) ──────────────────────────────────────────────
+
+    @Transactional(value = "tableTransactionManager", readOnly = true)
+    public KotResponse generateKot(String orderId) {
+        DineOrder order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+
+        List<KotResponse.KotItem> kotItems = order.getItems().stream()
+                .filter(i -> i.getStatus() != OrderItemStatus.REJECTED && i.getStatus() != OrderItemStatus.CANCELLED)
+                .map(i -> KotResponse.KotItem.builder()
+                        .menuItemName(i.getMenuItemName())
+                        .quantity(i.getQuantity())
+                        .notes(i.getNotes())
+                        .build())
+                .collect(Collectors.toList());
+
+        return KotResponse.builder()
+                .kotNumber(order.getId())
+                .tableNumber(order.getSession().getTable().getTableNumber())
+                .restaurantId(order.getRestaurantId())
+                .captainId(order.getCaptainId())
+                .captainName(order.getCaptainName())
+                .generatedAt(Instant.now())
+                .items(kotItems)
+                .build();
+    }
+
+    // ─── Bill ─────────────────────────────────────────────────────────────────────
+
+    @Transactional(value = "tableTransactionManager", readOnly = true)
+    public BillResponse generateBill(String sessionId) {
+        TableSession session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new IllegalArgumentException("Session not found: " + sessionId));
+
+        Restaurant restaurant = restaurantRepository.findById(session.getRestaurantId()).orElse(null);
+
+        List<DineOrder> activeOrders = session.getOrders().stream()
+                .filter(o -> o.getStatus() != OrderStatus.CANCELLED)
+                .collect(Collectors.toList());
+
+        List<BillResponse.BillItem> billItems = new ArrayList<>();
+        BigDecimal subtotal = BigDecimal.ZERO;
+
+        for (DineOrder order : activeOrders) {
+            for (OrderItem item : order.getItems()) {
+                if (item.getStatus() == OrderItemStatus.REJECTED || item.getStatus() == OrderItemStatus.CANCELLED) continue;
+                billItems.add(BillResponse.BillItem.builder()
+                        .orderId(order.getId())
+                        .menuItemName(item.getMenuItemName())
+                        .quantity(item.getQuantity())
+                        .unitPrice(item.getUnitPrice())
+                        .totalPrice(item.getTotalPrice())
+                        .build());
+                subtotal = subtotal.add(item.getTotalPrice());
+            }
+        }
+
+        // Captain who last acted on any order in this session
+        String captainId = null;
+        String captainName = null;
+        for (DineOrder order : activeOrders) {
+            if (order.getCaptainId() != null) {
+                captainId = order.getCaptainId();
+                captainName = order.getCaptainName();
+            }
+        }
+
+        return BillResponse.builder()
+                .billNumber(session.getId())
+                .sessionId(session.getId())
+                .tableNumber(session.getTable().getTableNumber())
+                .restaurantId(session.getRestaurantId())
+                .restaurantName(restaurant != null ? restaurant.getName() : null)
+                .gstin(restaurant != null ? restaurant.getGstin() : null)
+                .currency(restaurant != null ? restaurant.getCurrency() : "INR")
+                .customerCount(session.getCustomerCount())
+                .captainId(captainId)
+                .captainName(captainName)
+                .sessionStartTime(session.getStartTime())
+                .generatedAt(Instant.now())
+                .items(billItems)
+                .subtotal(subtotal)
+                .build();
+    }
+
+    // ─── Feature 10: Peak Hour Analytics ─────────────────────────────────────────
+
+    @Transactional(value = "tableTransactionManager", readOnly = true)
+    public List<DailySalesReport.HourlyStats> getPeakHourAnalytics(String restaurantId, LocalDate from, LocalDate to) {
+        ZoneId zone = ZoneId.of("Asia/Kolkata");
+        Instant start = from.atStartOfDay(zone).toInstant();
+        Instant end = to.plusDays(1).atStartOfDay(zone).toInstant();
+
+        List<DineOrder> orders = orderRepository
+                .findByRestaurantIdAndCreatedAtBetweenAndStatusNot(restaurantId, start, end, OrderStatus.CANCELLED);
+
+        Map<Integer, List<DineOrder>> byHour = orders.stream()
+                .collect(Collectors.groupingBy(o -> o.getCreatedAt().atZone(zone).getHour()));
+
+        return IntStream.range(0, 24)
+                .mapToObj(hour -> {
+                    List<DineOrder> hourOrders = byHour.getOrDefault(hour, List.of());
+                    BigDecimal revenue = hourOrders.stream()
+                            .map(DineOrder::getTotalAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+                    return DailySalesReport.HourlyStats.builder()
+                            .hour(hour)
+                            .orderCount(hourOrders.size())
+                            .revenue(revenue)
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+}
