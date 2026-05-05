@@ -62,7 +62,7 @@ jwt:
 twilio:
   account-sid: YOUR_TWILIO_ACCOUNT_SID
   auth-token: YOUR_TWILIO_AUTH_TOKEN
-  from-number: 17543357802   # Replace with your Twilio trial number from the console
+  from-number: YOUR_TWILIO_FROM_NUMBER
 
 springdoc:
   packages-to-scan: com.example.scan_dineCustomer
