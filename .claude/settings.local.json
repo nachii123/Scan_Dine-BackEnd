@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -f C:/Users/Nachiket/ideaProjects/Scan_dine_Customer/src/main/java/com/example/scan_dineCustomer/entity/MenuCategory.java)",
+      "Bash(rm -f C:/Users/Nachiket/ideaProjects/Scan_dine_Customer/src/main/java/com/example/scan_dineCustomer/entity/Entity.java)",
+      "Bash(rm -f C:/Users/Nachiket/ideaProjects/Scan_dine_Customer/src/main/java/com/example/scan_dineCustomer/controller/Controller.java)",
+      "Bash(rm -f C:/Users/Nachiket/ideaProjects/Scan_dine_Customer/src/main/java/com/example/scan_dineCustomer/model/Model.java)",
+      "Bash(rm -f C:/Users/Nachiket/ideaProjects/Scan_dine_Customer/src/main/java/com/example/scan_dineCustomer/model/Category.java)",
+      "Bash(del *)"
+    ]
+  }
+}
