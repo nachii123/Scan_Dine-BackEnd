@@ -1,6 +1,7 @@
 package com.example.scan_dineCustomer.table.dto;
 
 import com.example.scan_dineCustomer.enums.TableStatus;
+import com.example.scan_dineCustomer.restaurant.dto.BaseResponse;
 import com.example.scan_dineCustomer.table.entity.RestaurantTable;
 import lombok.Builder;
 import lombok.Data;

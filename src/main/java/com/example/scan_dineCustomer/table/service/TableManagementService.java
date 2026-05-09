@@ -91,6 +91,14 @@ public class TableManagementService {
     }
 
     @Transactional(value = "tableTransactionManager", readOnly = true)
+    public List<TableResponse> getAvailableTables(String restaurantId) {
+        return tableRepository.findByRestaurantId(restaurantId).stream()
+                .filter(t -> t.isActive() && t.getStatus() == TableStatus.AVAILABLE)
+                .map(TableResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(value = "tableTransactionManager", readOnly = true)
     public TableResponse getTableStatus(String tableId, String restaurantId) {
         RestaurantTable table = tableRepository.findByIdAndRestaurantId(tableId, restaurantId)
                 .orElseThrow(() -> new IllegalArgumentException("Table not found"));
