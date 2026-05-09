@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 
 @Data
 @Builder
-public class OrderResponse {
+public class OrderResponse{
     private String id;
     private String sessionId;
     private String tableId;

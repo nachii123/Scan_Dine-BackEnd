@@ -2,12 +2,10 @@ package com.example.scan_dineCustomer.table.service;
 
 import com.example.scan_dineCustomer.entity.MenuItem;
 import com.example.scan_dineCustomer.entity.Restaurant;
-import com.example.scan_dineCustomer.enums.OrderItemStatus;
-import com.example.scan_dineCustomer.enums.OrderStatus;
-import com.example.scan_dineCustomer.enums.SessionStatus;
-import com.example.scan_dineCustomer.enums.TableStatus;
+import com.example.scan_dineCustomer.enums.*;
 import com.example.scan_dineCustomer.repo.MenuItemRepository;
 import com.example.scan_dineCustomer.repo.RestaurantRepository;
+import com.example.scan_dineCustomer.restaurant.dto.BaseResponse;
 import com.example.scan_dineCustomer.table.dto.BillResponse;
 import com.example.scan_dineCustomer.table.dto.DailySalesReport;
 import com.example.scan_dineCustomer.table.dto.EstimatedWaitResponse;
@@ -32,6 +30,8 @@ import com.example.scan_dineCustomer.table.repository.TableSessionRepository;
 import com.example.scan_dineCustomer.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -156,8 +156,8 @@ public class OrderManagementService {
     }
 
     @Transactional(value = "tableTransactionManager", readOnly = true)
-    public List<OrderResponse> getOrdersByCustomerId(String customerId) {
-        return orderRepository.findByCustomerIdOrderByCreatedAtDesc(customerId).stream()
+    public List<OrderResponse> getOrdersByCustomerId(String customerId, String restaurantId) {
+        return orderRepository.findByCustomerIdAndRestaurantIdOrderByCreatedAtDesc(customerId, restaurantId).stream()
                 .map(OrderResponse::from)
                 .collect(Collectors.toList());
     }
@@ -186,8 +186,13 @@ public class OrderManagementService {
 
     @Transactional("tableTransactionManager")
     public OrderResponse acceptOrder(String orderId, String captainId, String captainName) {
-        DineOrder order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        log.info("Accepting order {}", orderId);
+        DineOrder order = orderRepository.findDineOrderById(orderId);
+        if(ObjectUtils.isEmpty(order)){
+            log.info("Order not found {}", orderId);
+            return OrderResponse.from(order);
+        }
+//                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
 
         order.setStatus(OrderStatus.ACCEPTED);
         order.setCaptainId(captainId);

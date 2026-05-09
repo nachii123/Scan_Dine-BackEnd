@@ -49,9 +49,9 @@ public class CaptainController {
         return ResponseEntity.ok(tableService.createTable(request));
     }
 
-    @GetMapping("/tables")
-    public ResponseEntity<List<CaptainTableView>> getCaptainView(@AuthenticationPrincipal CaptainPrincipal captain) {
-        return ResponseEntity.ok(tableService.getCaptainView(captain.getRestaurantId()));
+    @GetMapping("/{restaurantId}/tables")
+    public ResponseEntity<List<CaptainTableView>> getCaptainView(@PathVariable String restaurantId) {
+        return ResponseEntity.ok(tableService.getCaptainView(restaurantId));
     }
 
     @PostMapping("/tables/{tableId}/clear")
@@ -72,9 +72,9 @@ public class CaptainController {
 
     // ─── Order Management ────────────────────────────────────────────────────────
 
-    @GetMapping("/orders/pending")
-    public ResponseEntity<List<OrderResponse>> getPendingOrders(@AuthenticationPrincipal CaptainPrincipal captain) {
-        return ResponseEntity.ok(orderService.getPendingOrders(captain.getRestaurantId()));
+    @GetMapping("/orders/pending{resturantId}")
+    public ResponseEntity<List<OrderResponse>> getPendingOrders(@PathVariable String  resturantId) {
+        return ResponseEntity.ok(orderService.getPendingOrders(resturantId));
     }
 
     @GetMapping("/orders/{orderId}")

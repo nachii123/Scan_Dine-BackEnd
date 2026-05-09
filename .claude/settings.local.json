@@ -6,7 +6,13 @@
       "Bash(rm -f C:/Users/Nachiket/ideaProjects/Scan_dine_Customer/src/main/java/com/example/scan_dineCustomer/controller/Controller.java)",
       "Bash(rm -f C:/Users/Nachiket/ideaProjects/Scan_dine_Customer/src/main/java/com/example/scan_dineCustomer/model/Model.java)",
       "Bash(rm -f C:/Users/Nachiket/ideaProjects/Scan_dine_Customer/src/main/java/com/example/scan_dineCustomer/model/Category.java)",
-      "Bash(del *)"
+      "Bash(del *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git stash *)",
+      "Bash(git filter-branch *)",
+      "Bash(git push *)",
+      "Bash(npx ccusage@latest *)"
     ]
   }
 }
