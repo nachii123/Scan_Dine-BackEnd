@@ -109,10 +109,10 @@ public class MenuService {
                 .map(CategoryWithItems::from)
                 .collect(Collectors.toList());
 
-        return FullMenuResponse.builder()
-                .restaurantId(restaurant.getId())
-                .restaurantName(restaurant.getName())
-                .categories(categoryDTOs)
-                .build();
+        FullMenuResponse response = new FullMenuResponse();
+        response.setRestaurantId(restaurant.getId());
+        response.setRestaurantName(restaurant.getName());
+        response.setCategories(categoryDTOs);
+        return response;
     }
 }

@@ -1,11 +1,12 @@
 package com.example.scan_dineCustomer.table.service;
 
+import com.example.scan_dineCustomer.entity.Customer;
 import com.example.scan_dineCustomer.entity.MenuItem;
 import com.example.scan_dineCustomer.entity.Restaurant;
 import com.example.scan_dineCustomer.enums.*;
+import com.example.scan_dineCustomer.repo.CustomerRepository;
 import com.example.scan_dineCustomer.repo.MenuItemRepository;
 import com.example.scan_dineCustomer.repo.RestaurantRepository;
-import com.example.scan_dineCustomer.restaurant.dto.BaseResponse;
 import com.example.scan_dineCustomer.table.dto.BillResponse;
 import com.example.scan_dineCustomer.table.dto.DailySalesReport;
 import com.example.scan_dineCustomer.table.dto.EstimatedWaitResponse;
@@ -31,7 +32,6 @@ import com.example.scan_dineCustomer.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,6 +59,7 @@ public class OrderManagementService {
     private final OrderRepository orderRepository;
     private final MenuItemRepository menuItemRepository;
     private final RestaurantRepository restaurantRepository;
+    private final CustomerRepository customerRepository;
     private final JwtUtil jwtUtil;
     private final OrderRatingRepository orderRatingRepository;
 
@@ -71,10 +72,10 @@ public class OrderManagementService {
             throw new IllegalStateException("This table is currently inactive");
         }
 
-        // Return existing session if one is already active (multiple customers scanning the same table)
+        // Do not expose another customer's active session when the same QR is scanned again.
         Optional<TableSession> existing = sessionRepository.findByTable_IdAndStatus(table.getId(), SessionStatus.ACTIVE);
         if (existing.isPresent()) {
-            return SessionResponse.from(existing.get());
+            return SessionResponse.tableOccupied(table);
         }
 
         if (table.getStatus() != TableStatus.AVAILABLE) {
@@ -92,7 +93,7 @@ public class OrderManagementService {
         table.setStatus(TableStatus.OCCUPIED);
         tableRepository.save(table);
 
-        return SessionResponse.from(saved);
+        return SessionResponse.scanSuccess(saved);
     }
 
     @Transactional("tableTransactionManager")
@@ -112,11 +113,18 @@ public class OrderManagementService {
 
         String customerId = extractCustomerIdFromToken();
 
+        Customer customer = customerRepository.findById(customerId).orElse(null);
+
         DineOrder order = new DineOrder();
         order.setSession(session);
         order.setRestaurantId(request.getRestaurantId());
         order.setTableId(session.getTable().getId());
+        order.setTableNumber(session.getTable().getTableNumber());
         order.setCustomerId(customerId);
+        if (customer != null) {
+            order.setCustomerName(customer.getName());
+            order.setCustomerMobile(customer.getMobile());
+        }
         order.setNotes(request.getNotes());
         order.setStatus(OrderStatus.PENDING);
 
@@ -179,6 +187,14 @@ public class OrderManagementService {
     @Transactional(value = "tableTransactionManager", readOnly = true)
     public List<OrderResponse> getPendingOrders(String restaurantId) {
         List<OrderStatus> statuses = List.of(OrderStatus.PENDING, OrderStatus.PARTIALLY_ACCEPTED);
+        return orderRepository.findByRestaurantIdAndStatusIn(restaurantId, statuses).stream()
+                .map(OrderResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(value = "tableTransactionManager", readOnly = true)
+    public List<OrderResponse> getActiveOrders(String restaurantId) {
+        List<OrderStatus> statuses = List.of(OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY);
         return orderRepository.findByRestaurantIdAndStatusIn(restaurantId, statuses).stream()
                 .map(OrderResponse::from)
                 .collect(Collectors.toList());
@@ -423,11 +439,11 @@ public class OrderManagementService {
             MenuItem menuItem = menuItemRepository.findById(item.getMenuItemId()).orElse(null);
             int prepTime = menuItem != null ? menuItem.getPrepTimeMinutes() : 15;
             totalEstimated = Math.max(totalEstimated, prepTime); // parallel cooking
-            itemInfos.add(EstimatedWaitResponse.ItemWaitInfo.builder()
-                    .menuItemName(item.getMenuItemName())
-                    .quantity(item.getQuantity())
-                    .prepTimeMinutes(prepTime)
-                    .build());
+            EstimatedWaitResponse.ItemWaitInfo itemInfo = new EstimatedWaitResponse.ItemWaitInfo();
+            itemInfo.setMenuItemName(item.getMenuItemName());
+            itemInfo.setQuantity(item.getQuantity());
+            itemInfo.setPrepTimeMinutes(prepTime);
+            itemInfos.add(itemInfo);
         }
 
         long preparingFor = 0;
@@ -436,13 +452,13 @@ public class OrderManagementService {
         }
         int remaining = (int) Math.max(0, totalEstimated - preparingFor);
 
-        return EstimatedWaitResponse.builder()
-                .orderId(orderId)
-                .estimatedMinutes(totalEstimated)
-                .preparingForMinutes(preparingFor)
-                .remainingMinutes(remaining)
-                .items(itemInfos)
-                .build();
+        EstimatedWaitResponse response = new EstimatedWaitResponse();
+        response.setOrderId(orderId);
+        response.setEstimatedMinutes(totalEstimated);
+        response.setPreparingForMinutes(preparingFor);
+        response.setRemainingMinutes(remaining);
+        response.setItems(itemInfos);
+        return response;
     }
 
     // ─── Feature 6: Reorder ──────────────────────────────────────────────────────
@@ -553,12 +569,14 @@ public class OrderManagementService {
                 });
 
         List<DailySalesReport.TopItemStats> topItems = quantityMap.entrySet().stream()
-                .map(e -> DailySalesReport.TopItemStats.builder()
-                        .menuItemId(e.getKey())
-                        .menuItemName(nameMap.get(e.getKey()))
-                        .quantitySold(e.getValue()[0])
-                        .revenue(revenueMap.getOrDefault(e.getKey(), BigDecimal.ZERO))
-                        .build())
+                .map(e -> {
+                    DailySalesReport.TopItemStats stats = new DailySalesReport.TopItemStats();
+                    stats.setMenuItemId(e.getKey());
+                    stats.setMenuItemName(nameMap.get(e.getKey()));
+                    stats.setQuantitySold(e.getValue()[0]);
+                    stats.setRevenue(revenueMap.getOrDefault(e.getKey(), BigDecimal.ZERO));
+                    return stats;
+                })
                 .sorted((a, b) -> Integer.compare(b.getQuantitySold(), a.getQuantitySold()))
                 .limit(10)
                 .collect(Collectors.toList());
@@ -568,23 +586,25 @@ public class OrderManagementService {
                 .collect(Collectors.groupingBy(o -> o.getCreatedAt().atZone(zone).getHour()));
 
         List<DailySalesReport.HourlyStats> hourlyStats = byHour.entrySet().stream()
-                .map(e -> DailySalesReport.HourlyStats.builder()
-                        .hour(e.getKey())
-                        .orderCount(e.getValue().size())
-                        .revenue(e.getValue().stream().map(DineOrder::getTotalAmount).reduce(BigDecimal.ZERO, BigDecimal::add))
-                        .build())
+                .map(e -> {
+                    DailySalesReport.HourlyStats stats = new DailySalesReport.HourlyStats();
+                    stats.setHour(e.getKey());
+                    stats.setOrderCount(e.getValue().size());
+                    stats.setRevenue(e.getValue().stream().map(DineOrder::getTotalAmount).reduce(BigDecimal.ZERO, BigDecimal::add));
+                    return stats;
+                })
                 .sorted(java.util.Comparator.comparingInt(DailySalesReport.HourlyStats::getHour))
                 .collect(Collectors.toList());
 
-        return DailySalesReport.builder()
-                .date(date)
-                .restaurantId(restaurantId)
-                .totalRevenue(totalRevenue)
-                .totalOrders(orders.size())
-                .totalItemsSold(totalItemsSold)
-                .topItems(topItems)
-                .revenueByHour(hourlyStats)
-                .build();
+        DailySalesReport report = new DailySalesReport();
+        report.setDate(date);
+        report.setRestaurantId(restaurantId);
+        report.setTotalRevenue(totalRevenue);
+        report.setTotalOrders(orders.size());
+        report.setTotalItemsSold(totalItemsSold);
+        report.setTopItems(topItems);
+        report.setRevenueByHour(hourlyStats);
+        return report;
     }
 
     // ─── KOT (Kitchen Order Ticket) ──────────────────────────────────────────────
@@ -596,22 +616,24 @@ public class OrderManagementService {
 
         List<KotResponse.KotItem> kotItems = order.getItems().stream()
                 .filter(i -> i.getStatus() != OrderItemStatus.REJECTED && i.getStatus() != OrderItemStatus.CANCELLED)
-                .map(i -> KotResponse.KotItem.builder()
-                        .menuItemName(i.getMenuItemName())
-                        .quantity(i.getQuantity())
-                        .notes(i.getNotes())
-                        .build())
+                .map(i -> {
+                    KotResponse.KotItem item = new KotResponse.KotItem();
+                    item.setMenuItemName(i.getMenuItemName());
+                    item.setQuantity(i.getQuantity());
+                    item.setNotes(i.getNotes());
+                    return item;
+                })
                 .collect(Collectors.toList());
 
-        return KotResponse.builder()
-                .kotNumber(order.getId())
-                .tableNumber(order.getSession().getTable().getTableNumber())
-                .restaurantId(order.getRestaurantId())
-                .captainId(order.getCaptainId())
-                .captainName(order.getCaptainName())
-                .generatedAt(Instant.now())
-                .items(kotItems)
-                .build();
+        KotResponse response = new KotResponse();
+        response.setKotNumber(order.getId());
+        response.setTableNumber(order.getSession().getTable().getTableNumber());
+        response.setRestaurantId(order.getRestaurantId());
+        response.setCaptainId(order.getCaptainId());
+        response.setCaptainName(order.getCaptainName());
+        response.setGeneratedAt(Instant.now());
+        response.setItems(kotItems);
+        return response;
     }
 
     // ─── Bill ─────────────────────────────────────────────────────────────────────
@@ -633,13 +655,13 @@ public class OrderManagementService {
         for (DineOrder order : activeOrders) {
             for (OrderItem item : order.getItems()) {
                 if (item.getStatus() == OrderItemStatus.REJECTED || item.getStatus() == OrderItemStatus.CANCELLED) continue;
-                billItems.add(BillResponse.BillItem.builder()
-                        .orderId(order.getId())
-                        .menuItemName(item.getMenuItemName())
-                        .quantity(item.getQuantity())
-                        .unitPrice(item.getUnitPrice())
-                        .totalPrice(item.getTotalPrice())
-                        .build());
+                BillResponse.BillItem billItem = new BillResponse.BillItem();
+                billItem.setOrderId(order.getId());
+                billItem.setMenuItemName(item.getMenuItemName());
+                billItem.setQuantity(item.getQuantity());
+                billItem.setUnitPrice(item.getUnitPrice());
+                billItem.setTotalPrice(item.getTotalPrice());
+                billItems.add(billItem);
                 subtotal = subtotal.add(item.getTotalPrice());
             }
         }
@@ -654,22 +676,22 @@ public class OrderManagementService {
             }
         }
 
-        return BillResponse.builder()
-                .billNumber(session.getId())
-                .sessionId(session.getId())
-                .tableNumber(session.getTable().getTableNumber())
-                .restaurantId(session.getRestaurantId())
-                .restaurantName(restaurant != null ? restaurant.getName() : null)
-                .gstin(restaurant != null ? restaurant.getGstin() : null)
-                .currency(restaurant != null ? restaurant.getCurrency() : "INR")
-                .customerCount(session.getCustomerCount())
-                .captainId(captainId)
-                .captainName(captainName)
-                .sessionStartTime(session.getStartTime())
-                .generatedAt(Instant.now())
-                .items(billItems)
-                .subtotal(subtotal)
-                .build();
+        BillResponse response = new BillResponse();
+        response.setBillNumber(session.getId());
+        response.setSessionId(session.getId());
+        response.setTableNumber(session.getTable().getTableNumber());
+        response.setRestaurantId(session.getRestaurantId());
+        response.setRestaurantName(restaurant != null ? restaurant.getName() : null);
+        response.setGstin(restaurant != null ? restaurant.getGstin() : null);
+        response.setCurrency(restaurant != null ? restaurant.getCurrency() : "INR");
+        response.setCustomerCount(session.getCustomerCount());
+        response.setCaptainId(captainId);
+        response.setCaptainName(captainName);
+        response.setSessionStartTime(session.getStartTime());
+        response.setGeneratedAt(Instant.now());
+        response.setItems(billItems);
+        response.setSubtotal(subtotal);
+        return response;
     }
 
     // ─── Feature 10: Peak Hour Analytics ─────────────────────────────────────────
@@ -691,11 +713,11 @@ public class OrderManagementService {
                     List<DineOrder> hourOrders = byHour.getOrDefault(hour, List.of());
                     BigDecimal revenue = hourOrders.stream()
                             .map(DineOrder::getTotalAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
-                    return DailySalesReport.HourlyStats.builder()
-                            .hour(hour)
-                            .orderCount(hourOrders.size())
-                            .revenue(revenue)
-                            .build();
+                    DailySalesReport.HourlyStats stats = new DailySalesReport.HourlyStats();
+                    stats.setHour(hour);
+                    stats.setOrderCount(hourOrders.size());
+                    stats.setRevenue(revenue);
+                    return stats;
                 })
                 .collect(Collectors.toList());
     }

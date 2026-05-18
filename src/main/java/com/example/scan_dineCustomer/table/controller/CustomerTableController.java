@@ -38,7 +38,15 @@ public class CustomerTableController {
             if (request == null) return badRequest("Request body is required");
             if (!StringUtils.hasText(request.getRestaurantId())) return badRequest("restaurantId is required");
             if (!StringUtils.hasText(request.getTableId())) return badRequest("tableId is required");
-            return ResponseEntity.ok(orderService.scanTable(request));
+            SessionResponse response = orderService.scanTable(request);
+            if (!response.isCanPlaceOrder()) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+            }
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Resource not found: " + e.getMessage());
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Error scanning table: " + e.getMessage());
         } catch (NullPointerException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Resource not found: " + e.getMessage());
         } catch (Exception e) {

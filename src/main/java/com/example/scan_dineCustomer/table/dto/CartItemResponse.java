@@ -1,34 +1,31 @@
 package com.example.scan_dineCustomer.table.dto;
 
-import com.example.scan_dineCustomer.enums.OrderItemStatus;
-import com.example.scan_dineCustomer.table.entity.OrderItem;
+import com.example.scan_dineCustomer.table.entity.CartItem;
 import lombok.Data;
 
 import java.math.BigDecimal;
 
 @Data
-public class OrderItemResponse {
+public class CartItemResponse {
     private String id;
     private String menuItemId;
     private String menuItemName;
-    private int quantity;
-    private BigDecimal unitPrice;
-    private BigDecimal totalPrice;
-    private OrderItemStatus status;
-    private String notes;
     private String imageUrl;
+    private BigDecimal unitPrice;
+    private int quantity;
+    private BigDecimal totalPrice;
+    private String notes;
 
-    public static OrderItemResponse from(OrderItem item) {
-        OrderItemResponse response = new OrderItemResponse();
+    public static CartItemResponse from(CartItem item) {
+        CartItemResponse response = new CartItemResponse();
         response.setId(item.getId());
         response.setMenuItemId(item.getMenuItemId());
         response.setMenuItemName(item.getMenuItemName());
-        response.setQuantity(item.getQuantity());
-        response.setUnitPrice(item.getUnitPrice());
-        response.setTotalPrice(item.getTotalPrice());
-        response.setStatus(item.getStatus());
-        response.setNotes(item.getNotes());
         response.setImageUrl(item.getImageUrl());
+        response.setUnitPrice(item.getUnitPrice());
+        response.setQuantity(item.getQuantity());
+        response.setTotalPrice(item.getTotalPrice());
+        response.setNotes(item.getNotes());
         return response;
     }
 }

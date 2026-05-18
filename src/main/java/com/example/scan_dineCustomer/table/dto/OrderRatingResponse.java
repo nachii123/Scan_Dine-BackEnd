@@ -1,12 +1,10 @@
 package com.example.scan_dineCustomer.table.dto;
 
 import com.example.scan_dineCustomer.table.entity.OrderRating;
-import lombok.Builder;
 import lombok.Data;
 import java.time.Instant;
 
 @Data
-@Builder
 public class OrderRatingResponse {
     private String id;
     private String orderId;
@@ -17,14 +15,14 @@ public class OrderRatingResponse {
     private Instant createdAt;
 
     public static OrderRatingResponse from(OrderRating r) {
-        return OrderRatingResponse.builder()
-                .id(r.getId())
-                .orderId(r.getOrderId())
-                .customerId(r.getCustomerId())
-                .restaurantId(r.getRestaurantId())
-                .rating(r.getRating())
-                .comment(r.getComment())
-                .createdAt(r.getCreatedAt())
-                .build();
+        OrderRatingResponse response = new OrderRatingResponse();
+        response.setId(r.getId());
+        response.setOrderId(r.getOrderId());
+        response.setCustomerId(r.getCustomerId());
+        response.setRestaurantId(r.getRestaurantId());
+        response.setRating(r.getRating());
+        response.setComment(r.getComment());
+        response.setCreatedAt(r.getCreatedAt());
+        return response;
     }
 }

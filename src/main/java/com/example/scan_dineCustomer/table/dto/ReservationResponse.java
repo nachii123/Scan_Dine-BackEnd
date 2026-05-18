@@ -2,12 +2,10 @@ package com.example.scan_dineCustomer.table.dto;
 
 import com.example.scan_dineCustomer.enums.ReservationStatus;
 import com.example.scan_dineCustomer.table.entity.TableReservation;
-import lombok.Builder;
 import lombok.Data;
 import java.time.Instant;
 
 @Data
-@Builder
 public class ReservationResponse {
     private String id;
     private String restaurantId;
@@ -21,17 +19,17 @@ public class ReservationResponse {
     private Instant createdAt;
 
     public static ReservationResponse from(TableReservation r) {
-        return ReservationResponse.builder()
-                .id(r.getId())
-                .restaurantId(r.getRestaurantId())
-                .tableId(r.getTableId())
-                .customerName(r.getCustomerName())
-                .customerMobile(r.getCustomerMobile())
-                .partySize(r.getPartySize())
-                .reservedFor(r.getReservedFor())
-                .status(r.getStatus())
-                .notes(r.getNotes())
-                .createdAt(r.getCreatedAt())
-                .build();
+        ReservationResponse response = new ReservationResponse();
+        response.setId(r.getId());
+        response.setRestaurantId(r.getRestaurantId());
+        response.setTableId(r.getTableId());
+        response.setCustomerName(r.getCustomerName());
+        response.setCustomerMobile(r.getCustomerMobile());
+        response.setPartySize(r.getPartySize());
+        response.setReservedFor(r.getReservedFor());
+        response.setStatus(r.getStatus());
+        response.setNotes(r.getNotes());
+        response.setCreatedAt(r.getCreatedAt());
+        return response;
     }
 }

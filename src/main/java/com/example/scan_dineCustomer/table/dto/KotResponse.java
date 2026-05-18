@@ -1,13 +1,11 @@
 package com.example.scan_dineCustomer.table.dto;
 
-import lombok.Builder;
 import lombok.Data;
 
 import java.time.Instant;
 import java.util.List;
 
 @Data
-@Builder
 public class KotResponse {
 
     private String kotNumber;       // same as orderId
@@ -19,7 +17,6 @@ public class KotResponse {
     private List<KotItem> items;
 
     @Data
-    @Builder
     public static class KotItem {
         private String menuItemName;
         private int quantity;

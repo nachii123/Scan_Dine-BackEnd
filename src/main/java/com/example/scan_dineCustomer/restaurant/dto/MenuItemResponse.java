@@ -4,14 +4,12 @@ import com.example.scan_dineCustomer.entity.MenuItem;
 import com.example.scan_dineCustomer.enums.AllergenType;
 import com.example.scan_dineCustomer.enums.FoodType;
 import com.example.scan_dineCustomer.enums.SpiceLevel;
-import lombok.Builder;
 import lombok.Data;
 
 import java.math.BigDecimal;
 import java.util.Set;
 
 @Data
-@Builder
 public class MenuItemResponse {
     private String id;
     private String name;
@@ -27,19 +25,19 @@ public class MenuItemResponse {
     private Set<AllergenType> allergens;
 
     public static MenuItemResponse from(MenuItem item) {
-        return MenuItemResponse.builder()
-                .id(item.getId())
-                .name(item.getName())
-                .description(item.getDescription())
-                .basePrice(item.getBasePrice())
-                .foodType(item.getFoodType())
-                .spiceLevel(item.getSpiceLevel())
-                .imageUrl(item.getImageUrl())
-                .displayOrder(item.getDisplayOrder())
-                .available(item.isAvailable())
-                .categoryId(item.getCategory().getId())
-                .tags(item.getTags())
-                .allergens(item.getAllergens())
-                .build();
+        MenuItemResponse response = new MenuItemResponse();
+        response.setId(item.getId());
+        response.setName(item.getName());
+        response.setDescription(item.getDescription());
+        response.setBasePrice(item.getBasePrice());
+        response.setFoodType(item.getFoodType());
+        response.setSpiceLevel(item.getSpiceLevel());
+        response.setImageUrl(item.getImageUrl());
+        response.setDisplayOrder(item.getDisplayOrder());
+        response.setAvailable(item.isAvailable());
+        response.setCategoryId(item.getCategory().getId());
+        response.setTags(item.getTags());
+        response.setAllergens(item.getAllergens());
+        return response;
     }
 }

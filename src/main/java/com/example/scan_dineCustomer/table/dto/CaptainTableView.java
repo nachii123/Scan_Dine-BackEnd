@@ -1,11 +1,11 @@
 package com.example.scan_dineCustomer.table.dto;
 
 import com.example.scan_dineCustomer.enums.TableStatus;
-import lombok.Builder;
 import lombok.Data;
 
+import java.time.Instant;
+
 @Data
-@Builder
 public class CaptainTableView {
     private String id;
     private String tableNumber;
@@ -16,4 +16,8 @@ public class CaptainTableView {
     private boolean active;
     private String activeSessionId;   // null when AVAILABLE
     private long pendingOrderCount;   // 0 when AVAILABLE
+    private boolean billRequested;
+    private Instant billRequestedAt;
+    private boolean waiterCalled;
+    private Instant waiterCalledAt;
 }

@@ -2,11 +2,9 @@ package com.example.scan_dineCustomer.restaurant.dto;
 
 import com.example.scan_dineCustomer.entity.Category;
 import com.example.scan_dineCustomer.enums.CategoryType;
-import lombok.Builder;
 import lombok.Data;
 
 @Data
-@Builder
 public class MenuCategoryResponse {
     private String id;
     private String name;
@@ -18,15 +16,15 @@ public class MenuCategoryResponse {
     private String restaurantId;
 
     public static MenuCategoryResponse from(Category category) {
-        return MenuCategoryResponse.builder()
-                .id(category.getId())
-                .name(category.getName())
-                .description(category.getDescription())
-                .type(category.getType())
-                .imageUrl(category.getImageUrl())
-                .displayOrder(category.getDisplayOrder())
-                .available(category.isAvailable())
-                .restaurantId(category.getRestaurant().getId())
-                .build();
+        MenuCategoryResponse response = new MenuCategoryResponse();
+        response.setId(category.getId());
+        response.setName(category.getName());
+        response.setDescription(category.getDescription());
+        response.setType(category.getType());
+        response.setImageUrl(category.getImageUrl());
+        response.setDisplayOrder(category.getDisplayOrder());
+        response.setAvailable(category.isAvailable());
+        response.setRestaurantId(category.getRestaurant().getId());
+        return response;
     }
 }

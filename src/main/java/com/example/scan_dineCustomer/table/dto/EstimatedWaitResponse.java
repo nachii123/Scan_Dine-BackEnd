@@ -1,11 +1,9 @@
 package com.example.scan_dineCustomer.table.dto;
 
-import lombok.Builder;
 import lombok.Data;
 import java.util.List;
 
 @Data
-@Builder
 public class EstimatedWaitResponse {
     private String orderId;
     private int estimatedMinutes;
@@ -14,7 +12,6 @@ public class EstimatedWaitResponse {
     private List<ItemWaitInfo> items;
 
     @Data
-    @Builder
     public static class ItemWaitInfo {
         private String menuItemName;
         private int quantity;

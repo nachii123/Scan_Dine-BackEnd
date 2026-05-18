@@ -2,12 +2,10 @@ package com.example.scan_dineCustomer.restaurant.dto;
 
 import com.example.scan_dineCustomer.entity.Restaurant;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class RestaurantResponse {
@@ -24,18 +22,18 @@ public class RestaurantResponse {
     private String logoUrl;
 
     public static RestaurantResponse from(Restaurant restaurant) {
-        return RestaurantResponse.builder()
-                .id(restaurant.getId())
-                .name(restaurant.getName())
-                .slug(restaurant.getSlug())
-                .phone(restaurant.getPhone())
-                .email(restaurant.getEmail())
-                .address(restaurant.getAddress())
-                .city(restaurant.getCity())
-                .currency(restaurant.getCurrency())
-                .timezone(restaurant.getTimezone())
-                .gstin(restaurant.getGstin())
-                .logoUrl(restaurant.getLogoUrl())
-                .build();
+        RestaurantResponse response = new RestaurantResponse();
+        response.setId(restaurant.getId());
+        response.setName(restaurant.getName());
+        response.setSlug(restaurant.getSlug());
+        response.setPhone(restaurant.getPhone());
+        response.setEmail(restaurant.getEmail());
+        response.setAddress(restaurant.getAddress());
+        response.setCity(restaurant.getCity());
+        response.setCurrency(restaurant.getCurrency());
+        response.setTimezone(restaurant.getTimezone());
+        response.setGstin(restaurant.getGstin());
+        response.setLogoUrl(restaurant.getLogoUrl());
+        return response;
     }
 }

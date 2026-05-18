@@ -54,24 +54,37 @@ public class TableManagementService {
         return tables.stream().map(t -> {
             String activeSessionId = null;
             long pendingCount = 0;
+            boolean billRequested = false;
+            Instant billRequestedAt = null;
+            boolean waiterCalled = false;
+            Instant waiterCalledAt = null;
             if (t.getStatus() != TableStatus.AVAILABLE && t.getStatus() != TableStatus.INACTIVE) {
                 Optional<TableSession> session = sessionRepository.findByTable_IdAndStatus(t.getId(), SessionStatus.ACTIVE);
                 if (session.isPresent()) {
-                    activeSessionId = session.get().getId();
+                    TableSession s = session.get();
+                    activeSessionId = s.getId();
                     pendingCount = orderRepository.countBySessionIdAndStatus(activeSessionId, OrderStatus.PENDING);
+                    billRequested = s.isBillRequested();
+                    billRequestedAt = s.getBillRequestedAt();
+                    waiterCalled = s.isWaiterCalled();
+                    waiterCalledAt = s.getWaiterCalledAt();
                 }
             }
-            return CaptainTableView.builder()
-                    .id(t.getId())
-                    .tableNumber(t.getTableNumber())
-                    .capacity(t.getCapacity())
-                    .status(t.getStatus())
-                    .floor(t.getFloor())
-                    .qrCode(t.getQrCode())
-                    .active(t.isActive())
-                    .activeSessionId(activeSessionId)
-                    .pendingOrderCount(pendingCount)
-                    .build();
+            CaptainTableView view = new CaptainTableView();
+            view.setId(t.getId());
+            view.setTableNumber(t.getTableNumber());
+            view.setCapacity(t.getCapacity());
+            view.setStatus(t.getStatus());
+            view.setFloor(t.getFloor());
+            view.setQrCode(t.getQrCode());
+            view.setActive(t.isActive());
+            view.setActiveSessionId(activeSessionId);
+            view.setPendingOrderCount(pendingCount);
+            view.setBillRequested(billRequested);
+            view.setBillRequestedAt(billRequestedAt);
+            view.setWaiterCalled(waiterCalled);
+            view.setWaiterCalledAt(waiterCalledAt);
+            return view;
         }).collect(Collectors.toList());
     }
 

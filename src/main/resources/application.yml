@@ -13,36 +13,36 @@ spring:
 
   datasource:
     customer-ds:
-      url: jdbc:postgresql://localhost:5432/scan_dineIn?currentSchema=customers
-      username: postgres
-      password: admin
+      url: jdbc:postgresql://ep-young-hall-aqtvtudo.c-8.us-east-1.aws.neon.tech/neondb?currentSchema=customers&sslmode=require
+      username: neondb_owner
+      password: npg_TYXlUefd3ip6
       driver-class-name: org.postgresql.Driver
-      maximum-pool-size: 5
-      minimum-idle: 2
+      maximum-pool-size: 3
+      minimum-idle: 1
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
       pool-name: CustomerHikariPool
 
     restaurant-ds:
-      url: jdbc:postgresql://localhost:5432/scan_dineIn?currentSchema=restaurants
-      username: postgres
-      password: admin
+      url: jdbc:postgresql://ep-young-hall-aqtvtudo.c-8.us-east-1.aws.neon.tech/neondb?currentSchema=restaurants&sslmode=require
+      username: neondb_owner
+      password: npg_TYXlUefd3ip6
       driver-class-name: org.postgresql.Driver
-      maximum-pool-size: 5
-      minimum-idle: 2
+      maximum-pool-size: 3
+      minimum-idle: 1
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
       pool-name: RestaurantHikariPool
 
     table-ds:
-      url: jdbc:postgresql://localhost:5432/scan_dineIn?currentSchema=tables
-      username: postgres
-      password: admin
+      url: jdbc:postgresql://ep-young-hall-aqtvtudo.c-8.us-east-1.aws.neon.tech/neondb?currentSchema=tables&sslmode=require
+      username: neondb_owner
+      password: npg_TYXlUefd3ip6
       driver-class-name: org.postgresql.Driver
-      maximum-pool-size: 5
-      minimum-idle: 2
+      maximum-pool-size: 3
+      minimum-idle: 1
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
@@ -57,7 +57,7 @@ spring:
     open-in-view: false
 
 jwt:
-  secret: YOUR_JWT_SECRET_HERE
+  secret: 7f8c9a2b4d6e8f1a3c5b7d9e0f2a4c6e8b1d3f5a7c9e0b2d4f6a8c1e3d5b7f9
 
 twilio:
   account-sid: YOUR_TWILIO_ACCOUNT_SID
@@ -66,4 +66,3 @@ twilio:
 
 springdoc:
   packages-to-scan: com.example.scan_dineCustomer
-

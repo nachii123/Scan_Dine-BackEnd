@@ -72,9 +72,19 @@ public class CaptainController {
 
     // ─── Order Management ────────────────────────────────────────────────────────
 
-    @GetMapping("/orders/pending{resturantId}")
-    public ResponseEntity<List<OrderResponse>> getPendingOrders(@PathVariable String  resturantId) {
-        return ResponseEntity.ok(orderService.getPendingOrders(resturantId));
+    @GetMapping("/orders/pending/{restaurantId}")
+    public ResponseEntity<List<OrderResponse>> getPendingOrders(
+            @PathVariable String restaurantId,
+            @AuthenticationPrincipal CaptainPrincipal captain) {
+        if (!captain.getRestaurantId().equals(restaurantId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return ResponseEntity.ok(orderService.getPendingOrders(restaurantId));
+    }
+
+    @GetMapping("/orders/active/{restaurantId}")
+    public ResponseEntity<List<OrderResponse>> getActiveOrders(@PathVariable String restaurantId) {
+        return ResponseEntity.ok(orderService.getActiveOrders(restaurantId));
     }
 
     @GetMapping("/orders/{orderId}")
@@ -133,6 +143,11 @@ public class CaptainController {
     @GetMapping("/orders/{orderId}/kot")
     public ResponseEntity<KotResponse> getKot(@PathVariable String orderId) {
         return ResponseEntity.ok(orderService.generateKot(orderId));
+    }
+
+    @GetMapping("/sessions/{sessionId}/orders")
+    public ResponseEntity<List<OrderResponse>> getSessionOrders(@PathVariable String sessionId) {
+        return ResponseEntity.ok(orderService.getSessionOrders(sessionId));
     }
 
     @GetMapping("/sessions/{sessionId}/bill")
