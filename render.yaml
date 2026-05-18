@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: scan-dine-customer
+    runtime: java
+    buildCommand: ./gradlew bootJar -x test
+    startCommand: java -jar build/libs/app.jar
+    envVars:
+      - key: JAVA_VERSION
+        value: 17
+      - key: NEON_DB_USER
+        sync: false
+      - key: NEON_DB_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
