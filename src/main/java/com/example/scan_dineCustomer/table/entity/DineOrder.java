@@ -35,8 +35,17 @@ public class DineOrder {
     @Column(name = "table_id", nullable = false, length = 15)
     private String tableId;
 
+    @Column(name = "table_number", length = 20)
+    private String tableNumber;
+
     @Column(name = "customer_id", nullable = false, length = 15)
     private String customerId;
+
+    @Column(name = "customer_name", length = 100)
+    private String customerName;
+
+    @Column(name = "customer_mobile", length = 15)
+    private String customerMobile;
 
     @Column(name = "captain_id", length = 15)
     private String captainId;

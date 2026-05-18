@@ -2,13 +2,11 @@ package com.example.scan_dineCustomer.restaurant.dto;
 
 import com.example.scan_dineCustomer.entity.MenuItem;
 import com.example.scan_dineCustomer.enums.FoodType;
-import lombok.Builder;
 import lombok.Data;
 
 import java.math.BigDecimal;
 
 @Data
-@Builder
 public class ItemInMenu {
     private String id;
     private String name;
@@ -18,13 +16,13 @@ public class ItemInMenu {
     private String imageUrl;
 
     public static ItemInMenu from(MenuItem entity) {
-        return ItemInMenu.builder()
-                .id(entity.getId())
-                .name(entity.getName())
-                .description(entity.getDescription())
-                .price(entity.getBasePrice())
-                .foodType(entity.getFoodType())
-                .imageUrl(entity.getImageUrl())
-                .build();
+        ItemInMenu response = new ItemInMenu();
+        response.setId(entity.getId());
+        response.setName(entity.getName());
+        response.setDescription(entity.getDescription());
+        response.setPrice(entity.getBasePrice());
+        response.setFoodType(entity.getFoodType());
+        response.setImageUrl(entity.getImageUrl());
+        return response;
     }
 }

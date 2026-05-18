@@ -2,11 +2,9 @@ package com.example.scan_dineCustomer.table.dto;
 
 import com.example.scan_dineCustomer.enums.TableStatus;
 import com.example.scan_dineCustomer.table.entity.RestaurantTable;
-import lombok.Builder;
 import lombok.Data;
 
 @Data
-@Builder
 public class TableResponse {
     private String id;
     private String restaurantId;
@@ -18,15 +16,15 @@ public class TableResponse {
     private boolean active;
 
     public static TableResponse from(RestaurantTable t) {
-        return TableResponse.builder()
-                .id(t.getId())
-                .restaurantId(t.getRestaurantId())
-                .tableNumber(t.getTableNumber())
-                .capacity(t.getCapacity())
-                .status(t.getStatus())
-                .floor(t.getFloor())
-                .qrCode(t.getQrCode())
-                .active(t.isActive())
-                .build();
+        TableResponse response = new TableResponse();
+        response.setId(t.getId());
+        response.setRestaurantId(t.getRestaurantId());
+        response.setTableNumber(t.getTableNumber());
+        response.setCapacity(t.getCapacity());
+        response.setStatus(t.getStatus());
+        response.setFloor(t.getFloor());
+        response.setQrCode(t.getQrCode());
+        response.setActive(t.isActive());
+        return response;
     }
 }

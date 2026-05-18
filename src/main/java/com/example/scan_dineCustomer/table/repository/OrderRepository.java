@@ -10,8 +10,10 @@ import java.util.List;
 
 @Repository
 public interface OrderRepository extends JpaRepository<DineOrder, String> {
+    DineOrder findDineOrderById(String orderId);
     List<DineOrder> findBySessionId(String sessionId);
     List<DineOrder> findByCustomerIdOrderByCreatedAtDesc(String customerId);
+    List<DineOrder> findByCustomerIdAndRestaurantIdOrderByCreatedAtDesc(String customerId, String restaurantId);
     List<DineOrder> findByRestaurantIdAndStatus(String restaurantId, OrderStatus status);
     List<DineOrder> findByRestaurantIdAndStatusIn(String restaurantId, List<OrderStatus> statuses);
     List<DineOrder> findByTableIdAndStatus(String tableId, OrderStatus status);

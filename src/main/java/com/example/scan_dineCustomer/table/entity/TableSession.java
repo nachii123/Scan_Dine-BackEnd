@@ -1,6 +1,7 @@
 package com.example.scan_dineCustomer.table.entity;
 
 import com.example.scan_dineCustomer.enums.SessionStatus;
+import com.example.scan_dineCustomer.restaurant.dto.BaseResponse;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -17,7 +18,7 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class TableSession {
+public class TableSession extends BaseResponse {
 
     @Id
     @Column(length = 15)
