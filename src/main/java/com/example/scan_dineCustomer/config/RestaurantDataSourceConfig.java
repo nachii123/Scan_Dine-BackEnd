@@ -88,10 +88,11 @@ public class RestaurantDataSourceConfig {
 
     private Map<String, Object> jpaProperties(String schema) {
         Map<String, Object> props = new HashMap<>();
-        props.put("hibernate.hbm2ddl.auto",   "update");
-        props.put("hibernate.show_sql",       "false");
-        props.put("hibernate.format_sql",     "true");
-        props.put("hibernate.default_schema", "restaurants");
+        props.put("hibernate.hbm2ddl.auto",        "update");
+        props.put("hibernate.show_sql",             "false");
+        props.put("hibernate.format_sql",           "true");
+        props.put("hibernate.default_schema",       "restaurants");
+        props.put("hibernate.dialect",              "org.hibernate.dialect.PostgreSQLDialect");
         return props;
     }
 }

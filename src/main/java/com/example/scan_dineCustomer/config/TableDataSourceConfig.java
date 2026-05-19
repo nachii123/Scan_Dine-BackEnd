@@ -88,10 +88,11 @@ public class TableDataSourceConfig {
 
     private Map<String, Object> jpaProperties() {
         Map<String, Object> props = new HashMap<>();
-        props.put("hibernate.hbm2ddl.auto",   "update");
-        props.put("hibernate.show_sql",        "false");
-        props.put("hibernate.format_sql",      "true");
-        props.put("hibernate.default_schema",  "tables");
+        props.put("hibernate.hbm2ddl.auto",        "update");
+        props.put("hibernate.show_sql",             "false");
+        props.put("hibernate.format_sql",           "true");
+        props.put("hibernate.default_schema",       "tables");
+        props.put("hibernate.dialect",              "org.hibernate.dialect.PostgreSQLDialect");
         return props;
     }
 }

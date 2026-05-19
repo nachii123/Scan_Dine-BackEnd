@@ -14,8 +14,8 @@ spring:
   datasource:
     customer-ds:
       url: jdbc:postgresql://ep-young-hall-aqtvtudo.c-8.us-east-1.aws.neon.tech/neondb?currentSchema=customers&sslmode=require
-      username: ${NEON_DB_USER}
-      password: ${NEON_DB_PASSWORD}
+      username: ${NEON_DB_USER:neondb_owner}
+      password: ${NEON_DB_PASSWORD:npg_TYXlUefd3ip6}
       driver-class-name: org.postgresql.Driver
       maximum-pool-size: 3
       minimum-idle: 1
@@ -26,8 +26,8 @@ spring:
 
     restaurant-ds:
       url: jdbc:postgresql://ep-young-hall-aqtvtudo.c-8.us-east-1.aws.neon.tech/neondb?currentSchema=restaurants&sslmode=require
-      username: ${NEON_DB_USER}
-      password: ${NEON_DB_PASSWORD}
+      username: ${NEON_DB_USER:neondb_owner}
+      password: ${NEON_DB_PASSWORD:npg_TYXlUefd3ip6}
       driver-class-name: org.postgresql.Driver
       maximum-pool-size: 3
       minimum-idle: 1
@@ -38,8 +38,8 @@ spring:
 
     table-ds:
       url: jdbc:postgresql://ep-young-hall-aqtvtudo.c-8.us-east-1.aws.neon.tech/neondb?currentSchema=tables&sslmode=require
-      username: ${NEON_DB_USER}
-      password: ${NEON_DB_PASSWORD}
+      username: ${NEON_DB_USER:neondb_owner}
+      password: ${NEON_DB_PASSWORD:npg_TYXlUefd3ip6}
       driver-class-name: org.postgresql.Driver
       maximum-pool-size: 3
       minimum-idle: 1
@@ -57,7 +57,7 @@ spring:
     open-in-view: false
 
 jwt:
-  secret: ${JWT_SECRET}
+  secret: ${JWT_SECRET:7f8c9a2b4d6e8f1a3c5b7d9e0f2a4c6e8b1d3f5a7c9e0b2d4f6a8c1e3d5b7f9}
 
 twilio:
   account-sid: ${TWILIO_ACCOUNT_SID:placeholder}
