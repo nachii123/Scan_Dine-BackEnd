@@ -5,6 +5,7 @@ import com.example.scan_dineCustomer.enums.SessionStatus;
 import com.example.scan_dineCustomer.enums.TableStatus;
 import com.example.scan_dineCustomer.table.dto.CaptainTableView;
 import com.example.scan_dineCustomer.table.dto.CreateTableRequest;
+import com.example.scan_dineCustomer.table.dto.SessionResponse;
 import com.example.scan_dineCustomer.table.dto.TableResponse;
 import com.example.scan_dineCustomer.table.entity.RestaurantTable;
 import com.example.scan_dineCustomer.table.entity.TableSession;
@@ -116,6 +117,37 @@ public class TableManagementService {
         RestaurantTable table = tableRepository.findByIdAndRestaurantId(tableId, restaurantId)
                 .orElseThrow(() -> new IllegalArgumentException("Table not found"));
         return TableResponse.from(table);
+    }
+
+    @Transactional("tableTransactionManager")
+    public SessionResponse createSessionForTable(String tableId, String restaurantId, int customerCount) {
+        RestaurantTable table = tableRepository.findByIdAndRestaurantId(tableId, restaurantId)
+                .orElseThrow(() -> new IllegalArgumentException("Table not found"));
+
+        if (!table.isActive()) {
+            throw new IllegalStateException("This table is currently inactive");
+        }
+
+        Optional<TableSession> existing = sessionRepository.findByTable_IdAndStatus(table.getId(), SessionStatus.ACTIVE);
+        if (existing.isPresent()) {
+            return SessionResponse.tableOccupied(table);
+        }
+
+        if (table.getStatus() != TableStatus.AVAILABLE) {
+            throw new IllegalStateException("Table is not available. Current status: " + table.getStatus());
+        }
+
+        TableSession session = new TableSession();
+        session.setTable(table);
+        session.setRestaurantId(restaurantId);
+        session.setCustomerCount(customerCount > 0 ? customerCount : 1);
+        session.setStatus(SessionStatus.ACTIVE);
+
+        TableSession saved = sessionRepository.save(session);
+        table.setStatus(TableStatus.OCCUPIED);
+        tableRepository.save(table);
+
+        return SessionResponse.scanSuccess(saved);
     }
 
     @Transactional("tableTransactionManager")

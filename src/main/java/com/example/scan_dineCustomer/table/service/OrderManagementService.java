@@ -16,6 +16,7 @@ import com.example.scan_dineCustomer.table.dto.OrderItemRequest;
 import com.example.scan_dineCustomer.table.dto.OrderRatingRequest;
 import com.example.scan_dineCustomer.table.dto.OrderRatingResponse;
 import com.example.scan_dineCustomer.table.dto.OrderResponse;
+import com.example.scan_dineCustomer.table.dto.GuestOrderRequest;
 import com.example.scan_dineCustomer.table.dto.PlaceOrderRequest;
 import com.example.scan_dineCustomer.table.dto.ScanTableRequest;
 import com.example.scan_dineCustomer.table.dto.SessionResponse;
@@ -344,6 +345,61 @@ public class OrderManagementService {
 
         order.setTotalAmount(order.getTotalAmount().add(extra));
 
+        return OrderResponse.from(orderRepository.save(order));
+    }
+
+    @Transactional("tableTransactionManager")
+    public OrderResponse placeGuestOrder(GuestOrderRequest request, String captainId, String captainName) {
+        TableSession session = sessionRepository.findById(request.getSessionId())
+                .orElseThrow(() -> new IllegalArgumentException("Session not found: " + request.getSessionId()));
+
+        if (session.getStatus() != SessionStatus.ACTIVE) {
+            throw new IllegalStateException("Session is not active");
+        }
+
+        String guestId = "GUEST_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+
+        DineOrder order = new DineOrder();
+        order.setSession(session);
+        order.setRestaurantId(request.getRestaurantId());
+        order.setTableId(session.getTable().getId());
+        order.setTableNumber(session.getTable().getTableNumber());
+        order.setCustomerId(guestId);
+        order.setCustomerName(request.getGuestName() != null ? request.getGuestName() : "Guest");
+        order.setCustomerMobile(request.getGuestMobile());
+        order.setCaptainId(captainId);
+        order.setCaptainName(captainName);
+        order.setNotes(request.getNotes());
+        order.setStatus(OrderStatus.PENDING);
+
+        BigDecimal total = BigDecimal.ZERO;
+
+        for (OrderItemRequest itemReq : request.getItems()) {
+            MenuItem menuItem = menuItemRepository.findById(itemReq.getMenuItemId())
+                    .orElseThrow(() -> new IllegalArgumentException("Menu item not found: " + itemReq.getMenuItemId()));
+
+            if (!menuItem.isAvailable()) {
+                throw new IllegalStateException("Menu item is currently unavailable: " + menuItem.getName());
+            }
+
+            BigDecimal lineTotal = menuItem.getBasePrice().multiply(BigDecimal.valueOf(itemReq.getQuantity()));
+
+            OrderItem item = new OrderItem();
+            item.setOrder(order);
+            item.setMenuItemId(menuItem.getId());
+            item.setMenuItemName(menuItem.getName());
+            item.setImageUrl(menuItem.getImageUrl());
+            item.setQuantity(itemReq.getQuantity());
+            item.setUnitPrice(menuItem.getBasePrice());
+            item.setTotalPrice(lineTotal);
+            item.setNotes(itemReq.getNotes());
+            item.setStatus(OrderItemStatus.PENDING);
+
+            order.getItems().add(item);
+            total = total.add(lineTotal);
+        }
+
+        order.setTotalAmount(total);
         return OrderResponse.from(orderRepository.save(order));
     }
 
