@@ -5,6 +5,7 @@ import com.example.scan_dineCustomer.enums.ReservationStatus;
 import com.example.scan_dineCustomer.restaurant.dto.MenuItemResponse;
 import com.example.scan_dineCustomer.service.MenuService;
 import com.example.scan_dineCustomer.table.dto.AcceptRejectRequest;
+import com.example.scan_dineCustomer.table.dto.GuestOrderRequest;
 import com.example.scan_dineCustomer.table.dto.BillResponse;
 import com.example.scan_dineCustomer.table.dto.CaptainTableView;
 import com.example.scan_dineCustomer.table.dto.CreateTableRequest;
@@ -60,6 +61,26 @@ public class CaptainController {
             @AuthenticationPrincipal CaptainPrincipal captain) {
         tableService.clearTable(tableId, captain.getRestaurantId());
         return ResponseEntity.ok(Map.of("message", "Table cleared successfully"));
+    }
+
+    @PostMapping("/tables/{tableId}/session")
+    public ResponseEntity<?> createTableSession(
+            @PathVariable String tableId,
+            @AuthenticationPrincipal CaptainPrincipal captain,
+            @RequestParam(defaultValue = "1") int customerCount) {
+        try {
+            SessionResponse response = tableService.createSessionForTable(tableId, captain.getRestaurantId(), customerCount);
+            if (!response.isCanPlaceOrder()) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+            }
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error creating session: " + e.getMessage());
+        }
     }
 
     @PutMapping("/tables/{tableId}/active")
@@ -136,6 +157,25 @@ public class CaptainController {
             @AuthenticationPrincipal CaptainPrincipal captain,
             @RequestBody List<OrderItemRequest> items) {
         return ResponseEntity.ok(orderService.captainAddItems(orderId, items, captain.getCaptainId(), captain.getName()));
+    }
+
+    @PostMapping("/orders/guest")
+    public ResponseEntity<?> placeGuestOrder(
+            @RequestBody GuestOrderRequest request,
+            @AuthenticationPrincipal CaptainPrincipal captain) {
+        try {
+            if (request == null) return ResponseEntity.badRequest().body("Request body is required");
+            if (!org.springframework.util.StringUtils.hasText(request.getSessionId())) return ResponseEntity.badRequest().body("sessionId is required");
+            if (!org.springframework.util.StringUtils.hasText(request.getRestaurantId())) return ResponseEntity.badRequest().body("restaurantId is required");
+            if (request.getItems() == null || request.getItems().isEmpty()) return ResponseEntity.badRequest().body("items are required");
+            return ResponseEntity.ok(orderService.placeGuestOrder(request, captain.getCaptainId(), captain.getName()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error placing guest order: " + e.getMessage());
+        }
     }
 
     // ─── KOT & Bill ──────────────────────────────────────────────────────────────
