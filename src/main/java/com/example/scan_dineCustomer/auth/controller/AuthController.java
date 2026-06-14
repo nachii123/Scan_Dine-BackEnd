@@ -1,4 +1,4 @@
-package com.example.scan_dineCustomer.controller;
+package com.example.scan_dineCustomer.auth.controller;
 
 import com.example.scan_dineCustomer.dto.ApiResponse;
 import com.example.scan_dineCustomer.dto.AuthResponse;
@@ -7,8 +7,8 @@ import com.example.scan_dineCustomer.dto.OtpSendRequest;
 import com.example.scan_dineCustomer.dto.OtpVerifyRequest;
 import com.example.scan_dineCustomer.dto.RegistrationRequest;
 import com.example.scan_dineCustomer.entity.Customer;
-import com.example.scan_dineCustomer.service.AuthService;
-import com.example.scan_dineCustomer.service.OtpService;
+import com.example.scan_dineCustomer.auth.service.AuthService;
+import com.example.scan_dineCustomer.auth.service.OtpService;
 import com.example.scan_dineCustomer.util.JwtUtil;
 import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;

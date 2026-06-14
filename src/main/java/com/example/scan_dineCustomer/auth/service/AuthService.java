@@ -1,4 +1,4 @@
-package com.example.scan_dineCustomer.service;
+package com.example.scan_dineCustomer.auth.service;
 
 import com.example.scan_dineCustomer.dto.AuthResponse;
 import com.example.scan_dineCustomer.dto.LoginRequest;

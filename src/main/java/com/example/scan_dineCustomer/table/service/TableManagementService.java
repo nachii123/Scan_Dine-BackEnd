@@ -7,6 +7,7 @@ import com.example.scan_dineCustomer.table.dto.CaptainTableView;
 import com.example.scan_dineCustomer.table.dto.CreateTableRequest;
 import com.example.scan_dineCustomer.table.dto.SessionResponse;
 import com.example.scan_dineCustomer.table.dto.TableResponse;
+import com.example.scan_dineCustomer.table.dto.TableStatusResponse;
 import com.example.scan_dineCustomer.table.entity.RestaurantTable;
 import com.example.scan_dineCustomer.table.entity.TableSession;
 import com.example.scan_dineCustomer.table.repository.OrderRepository;
@@ -117,6 +118,21 @@ public class TableManagementService {
         RestaurantTable table = tableRepository.findByIdAndRestaurantId(tableId, restaurantId)
                 .orElseThrow(() -> new IllegalArgumentException("Table not found"));
         return TableResponse.from(table);
+    }
+
+    @Transactional(value = "tableTransactionManager", readOnly = true)
+    public TableStatusResponse getTableStatusSafe(String tableId, String restaurantId, String customerId) {
+        RestaurantTable table = tableRepository.findByIdAndRestaurantId(tableId, restaurantId)
+                .orElseThrow(() -> new IllegalArgumentException("Table not found"));
+        boolean canPlaceOrder = false;
+        var session = sessionRepository.findByTable_IdAndStatus(tableId, SessionStatus.ACTIVE).orElse(null);
+        if (session != null && customerId != null && customerId.equals(session.getCustomerId())) {
+            canPlaceOrder = true;
+        }
+        if (table.getStatus() == TableStatus.AVAILABLE && table.isActive()) {
+            canPlaceOrder = true;
+        }
+        return TableStatusResponse.from(table, canPlaceOrder);
     }
 
     @Transactional("tableTransactionManager")

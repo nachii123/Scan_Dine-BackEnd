@@ -10,13 +10,14 @@ import com.example.scan_dineCustomer.table.dto.ReservationRequest;
 import com.example.scan_dineCustomer.table.dto.ReservationResponse;
 import com.example.scan_dineCustomer.table.dto.ScanTableRequest;
 import com.example.scan_dineCustomer.table.dto.SessionResponse;
-import com.example.scan_dineCustomer.table.dto.TableResponse;
+import com.example.scan_dineCustomer.table.dto.TableStatusResponse;
 import com.example.scan_dineCustomer.table.service.OrderManagementService;
 import com.example.scan_dineCustomer.table.service.ReservationService;
 import com.example.scan_dineCustomer.table.service.TableManagementService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -47,6 +48,8 @@ public class CustomerTableController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Resource not found: " + e.getMessage());
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Error scanning table: " + e.getMessage());
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (NullPointerException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Resource not found: " + e.getMessage());
         } catch (Exception e) {
@@ -64,6 +67,8 @@ public class CustomerTableController {
             return ResponseEntity.ok(orderService.placeOrder(request));
         } catch (NullPointerException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Resource not found: " + e.getMessage());
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error placing order: " + e.getMessage());
         }
@@ -73,9 +78,13 @@ public class CustomerTableController {
     public ResponseEntity<?> getSessionOrders(@PathVariable String sessionId) {
         try {
             if (!StringUtils.hasText(sessionId)) return badRequest("sessionId is required");
-            return ResponseEntity.ok(orderService.getSessionOrders(sessionId));
+            var auth = SecurityContextHolder.getContext().getAuthentication();
+            String customerId = orderService.extractCustomerIdFromSecurityContext(auth);
+            return ResponseEntity.ok(orderService.getSessionOrdersForCustomer(sessionId, customerId));
         } catch (NullPointerException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Session not found: " + e.getMessage());
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error fetching session orders: " + e.getMessage());
         }
@@ -85,9 +94,13 @@ public class CustomerTableController {
     public ResponseEntity<?> getOrder(@PathVariable String orderId) {
         try {
             if (!StringUtils.hasText(orderId)) return badRequest("orderId is required");
-            return ResponseEntity.ok(orderService.getOrder(orderId));
+            var auth = SecurityContextHolder.getContext().getAuthentication();
+            String customerId = orderService.extractCustomerIdFromSecurityContext(auth);
+            return ResponseEntity.ok(orderService.getOrderForCustomer(orderId, customerId));
         } catch (NullPointerException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Order not found: " + e.getMessage());
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error fetching order: " + e.getMessage());
         }
@@ -125,7 +138,9 @@ public class CustomerTableController {
         try {
             if (!StringUtils.hasText(tableId)) return badRequest("tableId is required");
             if (!StringUtils.hasText(restaurantId)) return badRequest("restaurantId is required");
-            return ResponseEntity.ok(tableService.getTableStatus(tableId, restaurantId));
+            var auth = SecurityContextHolder.getContext().getAuthentication();
+            String customerId = orderService.extractCustomerIdFromSecurityContext(auth);
+            return ResponseEntity.ok(tableService.getTableStatusSafe(tableId, restaurantId, customerId));
         } catch (NullPointerException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Table not found: " + e.getMessage());
         } catch (Exception e) {
@@ -143,6 +158,8 @@ public class CustomerTableController {
             return ResponseEntity.ok(orderService.requestBill(sessionId, restaurantId));
         } catch (NullPointerException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Session not found: " + e.getMessage());
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error requesting bill: " + e.getMessage());
         }
@@ -156,6 +173,8 @@ public class CustomerTableController {
             return ResponseEntity.ok(orderService.callWaiter(sessionId, restaurantId));
         } catch (NullPointerException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Session not found: " + e.getMessage());
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error calling waiter: " + e.getMessage());
         }
@@ -174,6 +193,8 @@ public class CustomerTableController {
             return ResponseEntity.ok(orderService.rateOrder(orderId, request, customerId));
         } catch (NullPointerException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Order not found: " + e.getMessage());
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error rating order: " + e.getMessage());
         }
@@ -185,9 +206,13 @@ public class CustomerTableController {
     public ResponseEntity<?> getWaitTime(@PathVariable String orderId) {
         try {
             if (!StringUtils.hasText(orderId)) return badRequest("orderId is required");
-            return ResponseEntity.ok(orderService.getEstimatedWaitTime(orderId));
+            var auth = SecurityContextHolder.getContext().getAuthentication();
+            String customerId = orderService.extractCustomerIdFromSecurityContext(auth);
+            return ResponseEntity.ok(orderService.getEstimatedWaitTimeForCustomer(orderId, customerId));
         } catch (NullPointerException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Order not found: " + e.getMessage());
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error fetching wait time: " + e.getMessage());
         }
@@ -209,6 +234,8 @@ public class CustomerTableController {
                     request.getPreviousOrderId(), request.getSessionId(), request.getRestaurantId(), customerId));
         } catch (NullPointerException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Resource not found: " + e.getMessage());
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error processing reorder: " + e.getMessage());
         }

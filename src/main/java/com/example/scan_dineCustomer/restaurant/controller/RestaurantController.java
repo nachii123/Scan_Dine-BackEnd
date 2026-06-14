@@ -1,4 +1,4 @@
-package com.example.scan_dineCustomer.controller;
+package com.example.scan_dineCustomer.restaurant.controller;
 
 import com.example.scan_dineCustomer.dto.RestaurantOnboardRequest;
 import com.example.scan_dineCustomer.entity.Restaurant;
@@ -7,8 +7,8 @@ import com.example.scan_dineCustomer.restaurant.dto.MenuCategoryRequest;
 import com.example.scan_dineCustomer.restaurant.dto.MenuCategoryResponse;
 import com.example.scan_dineCustomer.restaurant.dto.MenuItemRequest;
 import com.example.scan_dineCustomer.restaurant.dto.MenuItemResponse;
-import com.example.scan_dineCustomer.service.MenuService;
-import com.example.scan_dineCustomer.service.RestaurantService;
+import com.example.scan_dineCustomer.restaurant.service.MenuService;
+import com.example.scan_dineCustomer.restaurant.service.RestaurantService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

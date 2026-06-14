@@ -9,10 +9,12 @@ import com.example.scan_dineCustomer.table.entity.Cart;
 import com.example.scan_dineCustomer.table.entity.CartItem;
 import com.example.scan_dineCustomer.table.repository.CartItemRepository;
 import com.example.scan_dineCustomer.table.repository.CartRepository;
+import com.example.scan_dineCustomer.table.repository.TableSessionRepository;
 import com.example.scan_dineCustomer.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,11 +28,13 @@ public class CartService {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final MenuItemRepository menuItemRepository;
+    private final TableSessionRepository sessionRepository;
     private final JwtUtil jwtUtil;
 
     @Transactional("tableTransactionManager")
     public CartResponse addToCart(AddToCartRequest request, Authentication auth) {
         String customerId = extractCustomerId(auth);
+        assertSessionOwnership(request.getSessionId(), request.getRestaurantId(), customerId);
 
         MenuItem menuItem = menuItemRepository.findById(request.getMenuItemId())
                 .orElseThrow(() -> new IllegalArgumentException("Menu item not found: " + request.getMenuItemId()));
@@ -82,6 +86,7 @@ public class CartService {
     @Transactional(value = "tableTransactionManager", readOnly = true)
     public CartResponse getCart(String sessionId, String restaurantId, Authentication auth) {
         String customerId = extractCustomerId(auth);
+        assertSessionOwnership(sessionId, restaurantId, customerId);
         Cart cart = cartRepository.findBySessionIdAndCustomerIdAndRestaurantId(sessionId, customerId, restaurantId)
                 .orElseGet(() -> emptyCart(sessionId, restaurantId, customerId));
         return CartResponse.from(cart);
@@ -101,10 +106,7 @@ public class CartService {
         CartItem item = cartItemRepository.findById(cartItemId)
                 .orElseThrow(() -> new IllegalArgumentException("Cart item not found: " + cartItemId));
 
-        // Ensure item belongs to this customer's cart
-        if (!item.getCart().getCustomerId().equals(customerId)) {
-            throw new IllegalArgumentException("Unauthorized: cart item does not belong to you");
-        }
+        assertCartOwnership(item.getCart().getSessionId(), item.getCart().getRestaurantId(), customerId);
 
         if (request.getQuantity() <= 0) {
             Cart cart = item.getCart();
@@ -126,10 +128,7 @@ public class CartService {
         CartItem item = cartItemRepository.findById(cartItemId)
                 .orElseThrow(() -> new IllegalArgumentException("Cart item not found: " + cartItemId));
 
-        // Ensure item belongs to this customer's cart
-        if (!item.getCart().getCustomerId().equals(customerId)) {
-            throw new IllegalArgumentException("Unauthorized: cart item does not belong to you");
-        }
+        assertCartOwnership(item.getCart().getSessionId(), item.getCart().getRestaurantId(), customerId);
 
         Cart cart = item.getCart();
         cart.getItems().remove(item);
@@ -141,6 +140,7 @@ public class CartService {
     @Transactional("tableTransactionManager")
     public void clearCart(String sessionId, String restaurantId, Authentication auth) {
         String customerId = extractCustomerId(auth);
+        assertSessionOwnership(sessionId, restaurantId, customerId);
         cartRepository.findBySessionIdAndCustomerIdAndRestaurantId(sessionId, customerId, restaurantId)
                 .ifPresent(cartRepository::delete);
     }
@@ -162,5 +162,17 @@ public class CartService {
             throw new IllegalStateException("Authentication token missing");
         }
         return jwtUtil.extractCustomerId(token);
+    }
+
+    private void assertSessionOwnership(String sessionId, String restaurantId, String customerId) {
+        var session = sessionRepository.findByIdAndRestaurantId(sessionId, restaurantId)
+                .orElseThrow(() -> new IllegalArgumentException("Session not found: " + sessionId));
+        if (!customerId.equals(session.getCustomerId())) {
+            throw new AccessDeniedException("Session is owned by another customer");
+        }
+    }
+
+    private void assertCartOwnership(String sessionId, String restaurantId, String customerId) {
+        assertSessionOwnership(sessionId, restaurantId, customerId);
     }
 }

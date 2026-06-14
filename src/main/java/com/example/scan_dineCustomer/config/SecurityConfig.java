@@ -38,6 +38,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/captain/auth/**").permitAll()
+                        .requestMatchers("/api/demo-requests").permitAll()
                         .requestMatchers("/api/v1/restaurants/**").permitAll()
                         // Swagger
                         .requestMatchers(
@@ -48,7 +49,7 @@ public class SecurityConfig {
                                 "/webjars/**"
                         ).permitAll()
                         // --- SECURED ENDPOINTS (JWT required) ---
-                        .requestMatchers("/api/v1/tables/**").permitAll()
+                        .requestMatchers("/api/v1/tables/**").authenticated()
                         .requestMatchers("/api/v1/captain/**").hasRole("CAPTAIN")
                         .anyRequest().authenticated()
                 )
