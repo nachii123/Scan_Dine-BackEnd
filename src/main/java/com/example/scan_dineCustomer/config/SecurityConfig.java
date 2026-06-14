@@ -46,6 +46,10 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/v3/api-docs",
+                                "/dine_in_customer/swagger-ui.html",
+                                "/dine_in_customer/swagger-ui/**",
+                                "/dine_in_customer/v3/api-docs/**",
+                                "/dine_in_customer/v3/api-docs",
                                 "/webjars/**"
                         ).permitAll()
                         // --- SECURED ENDPOINTS (JWT required) ---
