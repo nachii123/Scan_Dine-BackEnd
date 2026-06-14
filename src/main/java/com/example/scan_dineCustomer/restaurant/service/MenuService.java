@@ -1,4 +1,4 @@
-package com.example.scan_dineCustomer.service;
+package com.example.scan_dineCustomer.restaurant.service;
 
 import com.example.scan_dineCustomer.entity.Category;
 import com.example.scan_dineCustomer.entity.MenuItem;

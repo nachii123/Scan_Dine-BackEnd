@@ -34,6 +34,9 @@ public class TableSession extends BaseResponse {
     @Column(name = "customer_count", nullable = false)
     private int customerCount = 1;
 
+    @Column(name = "customer_id", length = 15)
+    private String customerId;
+
     @Column(name = "start_time", nullable = false)
     private Instant startTime;
 

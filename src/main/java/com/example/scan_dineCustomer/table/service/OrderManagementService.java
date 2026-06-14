@@ -33,6 +33,8 @@ import com.example.scan_dineCustomer.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -66,6 +68,7 @@ public class OrderManagementService {
 
     @Transactional("tableTransactionManager")
     public SessionResponse scanTable(ScanTableRequest request) {
+        String customerId = extractCustomerIdFromToken();
         RestaurantTable table = tableRepository.findByIdAndRestaurantId(request.getTableId(), request.getRestaurantId())
                 .orElseThrow(() -> new IllegalArgumentException("Table not found"));
 
@@ -76,7 +79,9 @@ public class OrderManagementService {
         // Do not expose another customer's active session when the same QR is scanned again.
         Optional<TableSession> existing = sessionRepository.findByTable_IdAndStatus(table.getId(), SessionStatus.ACTIVE);
         if (existing.isPresent()) {
-            return SessionResponse.tableOccupied(table);
+            TableSession activeSession = existing.get();
+            assertSessionOwnership(activeSession, customerId, request.getRestaurantId(), request.getTableId());
+            return SessionResponse.from(activeSession);
         }
 
         if (table.getStatus() != TableStatus.AVAILABLE) {
@@ -86,6 +91,7 @@ public class OrderManagementService {
         TableSession session = new TableSession();
         session.setTable(table);
         session.setRestaurantId(request.getRestaurantId());
+        session.setCustomerId(customerId);
         session.setCustomerCount(request.getCustomerCount() > 0 ? request.getCustomerCount() : 1);
         session.setStatus(SessionStatus.ACTIVE);
 
@@ -99,20 +105,18 @@ public class OrderManagementService {
 
     @Transactional("tableTransactionManager")
     public OrderResponse placeOrder(PlaceOrderRequest request) {
+        String customerId = extractCustomerIdFromToken();
         TableSession session = sessionRepository.findById(request.getSessionId())
                 .orElseThrow(() -> new IllegalArgumentException("Session not found: " + request.getSessionId()));
 
         if (session.getStatus() != SessionStatus.ACTIVE) {
-            log.info("Session Id is INACTIVE {}", session.getStatus());
-            return null;
+            throw new IllegalStateException("Session is not active");
         }
+        assertSessionOwnership(session, customerId, request.getRestaurantId(), null);
 
         if (request.getItems() == null || request.getItems().isEmpty()) {
-            log.info("request items null or empty {}", request.getItems());
-            return null;
+            throw new IllegalArgumentException("At least one item is required");
         }
-
-        String customerId = extractCustomerIdFromToken();
 
         Customer customer = customerRepository.findById(customerId).orElse(null);
 
@@ -137,8 +141,7 @@ public class OrderManagementService {
             log.info("Menu {}", menuItem);
 
             if (!menuItem.isAvailable()) {
-                log.info("Menu item is currently unavailable: {}", menuItem.getName());
-                return null;
+                throw new IllegalStateException("Menu item is currently unavailable: " + menuItem.getName());
             }
 
             BigDecimal lineTotal = menuItem.getBasePrice().multiply(BigDecimal.valueOf(itemReq.getQuantity()));
@@ -172,8 +175,29 @@ public class OrderManagementService {
     }
 
     @Transactional(value = "tableTransactionManager", readOnly = true)
+    public OrderResponse getOrderForCustomer(String orderId, String customerId) {
+        DineOrder order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        if (!customerId.equals(order.getCustomerId())) {
+            throw new AccessDeniedException("You do not have access to this order");
+        }
+        return OrderResponse.from(order);
+    }
+
+    @Transactional(value = "tableTransactionManager", readOnly = true)
     public List<OrderResponse> getSessionOrders(String sessionId) {
         return orderRepository.findBySessionId(sessionId).stream()
+                .map(OrderResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(value = "tableTransactionManager", readOnly = true)
+    public List<OrderResponse> getSessionOrdersForCustomer(String sessionId, String customerId) {
+        TableSession session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new IllegalArgumentException("Session not found: " + sessionId));
+        assertSessionOwnership(session, customerId, session.getRestaurantId(), null);
+        return orderRepository.findBySessionId(sessionId).stream()
+                .filter(order -> customerId.equals(order.getCustomerId()))
                 .map(OrderResponse::from)
                 .collect(Collectors.toList());
     }
@@ -206,10 +230,8 @@ public class OrderManagementService {
         log.info("Accepting order {}", orderId);
         DineOrder order = orderRepository.findDineOrderById(orderId);
         if(ObjectUtils.isEmpty(order)){
-            log.info("Order not found {}", orderId);
-            return OrderResponse.from(order);
+            throw new IllegalArgumentException("Order not found: " + orderId);
         }
-//                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
 
         order.setStatus(OrderStatus.ACCEPTED);
         order.setCaptainId(captainId);
@@ -412,6 +434,7 @@ public class OrderManagementService {
         if (session.getStatus() != SessionStatus.ACTIVE) {
             throw new IllegalStateException("Session is not active");
         }
+        assertSessionOwnership(session, extractCustomerIdFromToken(), restaurantId, null);
         session.setBillRequested(true);
         session.setBillRequestedAt(Instant.now());
         return SessionResponse.from(sessionRepository.save(session));
@@ -424,6 +447,7 @@ public class OrderManagementService {
         if (session.getStatus() != SessionStatus.ACTIVE) {
             throw new IllegalStateException("Session is not active");
         }
+        assertSessionOwnership(session, extractCustomerIdFromToken(), restaurantId, null);
         session.setWaiterCalled(true);
         session.setWaiterCalledAt(Instant.now());
         return SessionResponse.from(sessionRepository.save(session));
@@ -515,6 +539,16 @@ public class OrderManagementService {
         response.setRemainingMinutes(remaining);
         response.setItems(itemInfos);
         return response;
+    }
+
+    @Transactional(value = "tableTransactionManager", readOnly = true)
+    public EstimatedWaitResponse getEstimatedWaitTimeForCustomer(String orderId, String customerId) {
+        DineOrder order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        if (!customerId.equals(order.getCustomerId())) {
+            throw new AccessDeniedException("You do not have access to this order");
+        }
+        return getEstimatedWaitTime(orderId);
     }
 
     // ─── Feature 6: Reorder ──────────────────────────────────────────────────────
@@ -776,5 +810,20 @@ public class OrderManagementService {
                     return stats;
                 })
                 .collect(Collectors.toList());
+    }
+
+    private void assertSessionOwnership(TableSession session, String customerId, String restaurantId, String tableId) {
+        if (session == null) {
+            throw new IllegalArgumentException("Session not found");
+        }
+        if (!customerId.equals(session.getCustomerId())) {
+            throw new AccessDeniedException("Session is owned by another customer");
+        }
+        if (!restaurantId.equals(session.getRestaurantId())) {
+            throw new IllegalStateException("Session does not belong to this restaurant");
+        }
+        if (tableId != null && session.getTable() != null && !tableId.equals(session.getTable().getId())) {
+            throw new IllegalStateException("Session does not belong to this table");
+        }
     }
 }

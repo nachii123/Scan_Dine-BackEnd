@@ -19,6 +19,7 @@ public class SessionResponse extends BaseResponse {
     private String tableId;
     private String tableNumber;
     private String restaurantId;
+    private String customerId;
     private int customerCount;
     private Instant startTime;
     private SessionStatus status;
@@ -36,6 +37,7 @@ public class SessionResponse extends BaseResponse {
         response.setTableId(s.getTable().getId());
         response.setTableNumber(s.getTable().getTableNumber());
         response.setRestaurantId(s.getRestaurantId());
+        response.setCustomerId(s.getCustomerId());
         response.setCustomerCount(s.getCustomerCount());
         response.setStartTime(s.getStartTime());
         response.setStatus(s.getStatus());
@@ -66,6 +68,7 @@ public class SessionResponse extends BaseResponse {
         response.setTableId(table.getId());
         response.setTableNumber(table.getTableNumber());
         response.setRestaurantId(table.getRestaurantId());
+        response.setCustomerId(null);
         response.setCanPlaceOrder(false);
         response.setSessionCreated(false);
         response.setTableStatus(TableStatus.OCCUPIED.name());

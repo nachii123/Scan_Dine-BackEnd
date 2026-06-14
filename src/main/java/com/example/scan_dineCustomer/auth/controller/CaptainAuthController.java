@@ -1,10 +1,10 @@
-package com.example.scan_dineCustomer.controller;
+package com.example.scan_dineCustomer.auth.controller;
 
 import com.example.scan_dineCustomer.dto.ApiResponse;
 import com.example.scan_dineCustomer.dto.CaptainAuthResponse;
 import com.example.scan_dineCustomer.dto.CaptainRegistrationRequest;
 import com.example.scan_dineCustomer.dto.LoginRequest;
-import com.example.scan_dineCustomer.service.CaptainAuthService;
+import com.example.scan_dineCustomer.auth.service.CaptainAuthService;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.http.HttpStatus;

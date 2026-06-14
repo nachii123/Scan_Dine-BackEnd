@@ -18,7 +18,10 @@ import java.util.Map;
 @Configuration
 @EnableTransactionManagement
 @EnableJpaRepositories(
-        basePackages            = "com.example.scan_dineCustomer.repo",
+        basePackages            = {
+                "com.example.scan_dineCustomer.repo",
+                "com.example.scan_dineCustomer.demo.repository"
+        },
         entityManagerFactoryRef = "customerEntityManagerFactory",
         transactionManagerRef   = "customerTransactionManager"
 )
@@ -71,7 +74,10 @@ public class CustomerDataSourceConfig {
         LocalContainerEntityManagerFactoryBean factory =
                 new LocalContainerEntityManagerFactoryBean();
         factory.setDataSource(dataSource);
-        factory.setPackagesToScan("com.example.scan_dineCustomer.entity");
+        factory.setPackagesToScan(
+                "com.example.scan_dineCustomer.entity",
+                "com.example.scan_dineCustomer.demo.entity"
+        );
         factory.setPersistenceUnitName("customerPU");
 
         HibernateJpaVendorAdapter adapter = new HibernateJpaVendorAdapter();

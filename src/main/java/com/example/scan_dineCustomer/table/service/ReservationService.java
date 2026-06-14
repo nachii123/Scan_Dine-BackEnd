@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.Duration;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -19,12 +20,27 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ReservationService {
 
+    private static final Duration RESERVATION_BUFFER = Duration.ofHours(2);
+
     private final TableReservationRepository reservationRepository;
 
     @Transactional("tableTransactionManager")
     public ReservationResponse createReservation(ReservationRequest request) {
         if (request.getReservedFor().isBefore(Instant.now())) {
             throw new IllegalArgumentException("Reservation time must be in the future");
+        }
+        Instant conflictWindowStart = request.getReservedFor().minus(RESERVATION_BUFFER);
+        Instant conflictWindowEnd = request.getReservedFor().plus(RESERVATION_BUFFER);
+        boolean conflict = reservationRepository
+                .findByRestaurantIdAndReservedForBetweenOrderByReservedFor(
+                        request.getRestaurantId(), conflictWindowStart, conflictWindowEnd)
+                .stream()
+                .anyMatch(existing ->
+                        existing.getStatus() == ReservationStatus.CONFIRMED
+                                && request.getTableId() != null
+                                && request.getTableId().equals(existing.getTableId()));
+        if (conflict) {
+            throw new IllegalStateException("Table is already reserved around this time");
         }
         TableReservation reservation = new TableReservation();
         reservation.setRestaurantId(request.getRestaurantId());

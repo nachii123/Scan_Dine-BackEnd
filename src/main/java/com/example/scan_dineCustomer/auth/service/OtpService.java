@@ -1,10 +1,11 @@
-package com.example.scan_dineCustomer.service;
+package com.example.scan_dineCustomer.auth.service;
 
 import com.example.scan_dineCustomer.dto.AuthResponse;
 import com.example.scan_dineCustomer.dto.OtpSendRequest;
 import com.example.scan_dineCustomer.dto.OtpVerifyRequest;
 import com.example.scan_dineCustomer.entity.Customer;
 import com.example.scan_dineCustomer.repo.CustomerRepository;
+import com.example.scan_dineCustomer.service.SmsService;
 import com.example.scan_dineCustomer.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;

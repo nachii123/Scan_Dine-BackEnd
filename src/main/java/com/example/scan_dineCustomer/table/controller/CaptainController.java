@@ -3,7 +3,7 @@ package com.example.scan_dineCustomer.table.controller;
 import com.example.scan_dineCustomer.config.CaptainPrincipal;
 import com.example.scan_dineCustomer.enums.ReservationStatus;
 import com.example.scan_dineCustomer.restaurant.dto.MenuItemResponse;
-import com.example.scan_dineCustomer.service.MenuService;
+import com.example.scan_dineCustomer.restaurant.service.MenuService;
 import com.example.scan_dineCustomer.table.dto.AcceptRejectRequest;
 import com.example.scan_dineCustomer.table.dto.GuestOrderRequest;
 import com.example.scan_dineCustomer.table.dto.BillResponse;

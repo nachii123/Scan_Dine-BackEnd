@@ -7,6 +7,7 @@ import com.example.scan_dineCustomer.table.service.CartService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +30,8 @@ public class CartController {
             return ResponseEntity.ok(cartService.addToCart(request, auth));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error adding to cart: " + e.getMessage());
         }
@@ -43,6 +46,8 @@ public class CartController {
             if (!StringUtils.hasText(sessionId)) return badRequest("sessionId is required");
             if (!StringUtils.hasText(restaurantId)) return badRequest("restaurantId is required");
             return ResponseEntity.ok(cartService.getCart(sessionId, restaurantId, auth));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error fetching cart: " + e.getMessage());
         }
@@ -53,6 +58,8 @@ public class CartController {
         try {
             if (!StringUtils.hasText(restaurantId)) return badRequest("restaurantId is required");
             return ResponseEntity.ok(cartService.getCartByRestaurant(restaurantId, auth));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error fetching cart: " + e.getMessage());
         }
@@ -69,6 +76,8 @@ public class CartController {
             return ResponseEntity.ok(cartService.updateCartItem(cartItemId, request, auth));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error updating cart item: " + e.getMessage());
         }
@@ -81,6 +90,8 @@ public class CartController {
             return ResponseEntity.ok(cartService.removeCartItem(cartItemId, auth));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error removing cart item: " + e.getMessage());
         }
@@ -96,6 +107,8 @@ public class CartController {
             if (!StringUtils.hasText(restaurantId)) return badRequest("restaurantId is required");
             cartService.clearCart(sessionId, restaurantId, auth);
             return ResponseEntity.ok("Cart cleared successfully");
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error clearing cart: " + e.getMessage());
         }
