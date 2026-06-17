@@ -21,6 +21,7 @@ public class WebConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOriginPatterns(List.of(
+                "https://scan-dine-web.onrender.com/",
                 "http://localhost:*",
                 "https://scan-dinein.onrender.com",
 
