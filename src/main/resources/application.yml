@@ -66,3 +66,7 @@ twilio:
 
 springdoc:
   packages-to-scan: com.example.scan_dineCustomer
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
