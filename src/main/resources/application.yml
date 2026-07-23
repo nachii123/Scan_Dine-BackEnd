@@ -65,8 +65,13 @@ twilio:
   from-number: ${TWILIO_FROM_NUMBER:placeholder}
 
 springdoc:
-  packages-to-scan: com.example.scan_dineCustomer
+  packages-to-scan: com.example.scan_dineCustomer,com.jarvis.aiagent
   swagger-ui:
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
+
+openrouter:
+  api-key: ${OPENROUTER_API_KEY}
+  base-url: https://openrouter.ai/api/v1/chat/completions
+  default-model: meta-llama/llama-3.1-8b-instruct
