@@ -19,3 +19,5 @@ services:
         sync: false
       - key: TWILIO_FROM_NUMBER
         sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
